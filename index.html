@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="C&C Quote">
@@ -35,7 +35,7 @@
   --safe-b:   env(safe-area-inset-bottom, 0px);
   --safe-t:   env(safe-area-inset-top, 0px);
   --nav-h:    56px;   /* top bar height */
-  --tab-h:    60px;   /* bottom tab bar */
+  --tab-h:    64px;   /* bottom tab bar */
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -51,6 +51,7 @@ html {
 body {
   min-height: 100%;
   min-height: -webkit-fill-available;
+  min-height: 100svh;
   overscroll-behavior: none;
 }
 
@@ -63,8 +64,11 @@ body {
 .app {
   display: flex;
   flex-direction: column;
+  /* dvh = dynamic viewport height, accounts for Safari's collapsible toolbar */
   height: 100dvh;
-  height: 100vh;
+  /* Fallback chain for older Safari */
+  height: -webkit-fill-available;
+  height: 100svh;
   overflow: hidden;
 }
 
@@ -117,7 +121,7 @@ body {
 }
 .content {
   padding: 16px;
-  padding-bottom: calc(var(--tab-h) + var(--safe-b) + 16px);
+  padding-bottom: calc(var(--tab-h) + max(var(--safe-b), 8px) + 32px);
   max-width: 860px;
   margin: 0 auto;
 }
@@ -134,13 +138,15 @@ body {
   border-top: 1px solid var(--border);
   display: flex;
   align-items: stretch;
-  padding-bottom: var(--safe-b);
-  height: calc(var(--tab-h) + var(--safe-b));
-  z-index: 50;
+  padding-bottom: max(var(--safe-b), 8px);
+  height: calc(var(--tab-h) + max(var(--safe-b), 8px));
+  z-index: 100;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  /* Ensure it stays above Safari chrome */
+  position: relative;
 }
 .bottomnav::-webkit-scrollbar { display: none; }
 .btab {
@@ -157,8 +163,11 @@ body {
   background: transparent;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
   position: relative;
   transition: opacity .12s;
+  /* Larger tap target */
+  min-height: 44px;
 }
 .btab:active { opacity: .7; }
 .btab.active .btab-icon { color: var(--accent); }
@@ -491,6 +500,50 @@ label.cb-row {
 
 /* ─── LEGAL NOTE ─── */
 .legal { font-size: 11px; color: var(--text3); line-height: 1.7; padding-top: 12px; border-top: 1px solid var(--border); margin-top: 12px; }
+/* ─── PHOTO GRID (quote page + print) ─── */
+.photo-section { margin-top: 0; }
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+.photo-thumb {
+  position: relative;
+  border-radius: var(--r);
+  overflow: hidden;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  aspect-ratio: 1;
+}
+.photo-thumb img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.photo-thumb .photo-label {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: rgba(0,0,0,.6);
+  color: #fff; font-size: 10px;
+  padding: 3px 6px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.photo-thumb .photo-del {
+  position: absolute; top: 4px; right: 4px;
+  background: rgba(0,0,0,.6); border: none;
+  color: #fff; font-size: 14px; border-radius: 50%;
+  width: 22px; height: 22px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+.file-nonimage {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 10px 12px;
+  margin-top: 8px; font-size: 13px;
+}
+.file-nonimage .fi-name { flex:1; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.file-nonimage .fi-del { background:none; border:none; color:var(--text3); cursor:pointer; font-size:16px; padding:2px 6px; }
 .no-print { /* hidden in print via @media print */ }
 
 /* ─── PRINT ─── */
@@ -523,6 +576,16 @@ label.cb-row {
   .tt { color: #333; }
   .legal { color: #888; font-size: 10px; }
   .cfield label { color: #666; }
+  /* Photo grid in print */
+  .photo-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .photo-thumb { border: 1px solid #ccc; aspect-ratio: 1; }
+  .photo-thumb .photo-del { display: none !important; }
+  .photo-label { background: rgba(0,0,0,.45) !important; }
+  .file-nonimage { border: 1px solid #ddd; background: #fff; }
+  .file-nonimage .fi-name { color: #333; }
+  .file-nonimage .fi-del { display: none !important; }
+  .photo-section .qm-hd { background: #f4f4f4; }
+  .photo-section .qm-title { color: #111; }
   .cfield input, .cfield textarea { border: 1px solid #ddd; background: #fff; color: #111; font-size: 13px; padding: 6px 8px; }
   .q-empty { color: #aaa; }
   /* Print header */
@@ -878,6 +941,7 @@ let S={
   addons:{},stormMat:'galv',
 };
 let uFiles=[],uDrawings=[];
+let uFileData=[],uDrawingData=[]; // {name,size,dataUrl,isImage}
 
 /* ══ MATH ══ */
 const CI=Math.ceil;
@@ -1012,10 +1076,26 @@ function updateQuote(){
   }else{
     bd+=`<div class="q-module"><div class="qm-hd"><span class="qm-title">Shroud</span><span class="qm-sub" style="color:var(--text3)">Not selected</span></div><div class="q-empty">No shroud — select one in the Fab tab.</div></div>`;
   }
-  const fc=uFiles.length+uDrawings.length;
+  const allData=[...uFileData,...uDrawingData];
+  const fc=allData.length;
   if(fc>0){
-    bd+=`<div class="q-module"><div class="qm-hd"><span class="qm-title">Attachments</span><span class="qm-sub" style="color:var(--text3)">${fc} file${fc>1?'s':''}</span></div><div class="qm-body">`;
-    [...uFiles,...uDrawings].forEach(f=>{bd+=`<div class="ql"><span class="ll">${f.name}</span><span class="lv" style="color:var(--text3);font-size:11px">${fmtSize(f.size)}</span></div>`;});
+    const imgs=allData.filter(d=>d.isImage);
+    const docs=allData.filter(d=>!d.isImage);
+    bd+=`<div class="q-module photo-section"><div class="qm-hd"><span class="qm-title">Job Photos &amp; Files</span><span class="qm-sub" style="color:var(--text3)">${fc} item${fc>1?'s':''}</span></div><div class="qm-body">`;
+    if(imgs.length>0){
+      bd+=`<div class="photo-grid">`;
+      imgs.forEach((d,i)=>{
+        bd+=`<div class="photo-thumb"><img src="${d.dataUrl}" alt="${d.name}" style="width:100%;height:100%;object-fit:cover;display:block;"/><span class="photo-label">${d.name}</span></div>`;
+      });
+      bd+=`</div>`;
+    }
+    if(docs.length>0){
+      docs.forEach(d=>{
+        const ext=d.name.split('.').pop().toUpperCase();
+        const icons={PDF:'📄',DWG:'📐',DXF:'📐'};
+        bd+=`<div class="file-nonimage" style="margin-top:8px"><span style="font-size:16px">${icons[ext]||'📎'}</span><span class="fi-name">${d.name}</span><span style="color:var(--text3);font-size:11px">${fmtSize(d.size)}</span></div>`;
+      });
+    }
     bd+=`</div></div>`;
   }
   document.getElementById('q-breakdown').innerHTML=bd;
@@ -1071,16 +1151,74 @@ function renderFiles(arr,id,key){
     el.appendChild(d);
   });
 }
-function addFiles(e){uFiles=[...uFiles,...Array.from(e.target.files)];renderFiles(uFiles,'file-list','f');}
-function addDrawings(e){uDrawings=[...uDrawings,...Array.from(e.target.files)];renderFiles(uDrawings,'draw-list','d');}
-function rmFile(i,key){if(key==='f'){uFiles.splice(i,1);renderFiles(uFiles,'file-list','f');}else{uDrawings.splice(i,1);renderFiles(uDrawings,'draw-list','d');}}
-function dropFiles(e){e.preventDefault();document.getElementById('upload-zone').classList.remove('dragover');uFiles=[...uFiles,...Array.from(e.dataTransfer.files)];renderFiles(uFiles,'file-list','f');}
+const IMG_TYPES=['image/jpeg','image/jpg','image/png','image/heic','image/webp','image/gif'];
+function readFileData(file){
+  return new Promise(res=>{
+    const isImg=IMG_TYPES.includes(file.type.toLowerCase());
+    if(!isImg){res({name:file.name,size:file.size,dataUrl:null,isImage:false});return;}
+    const r=new FileReader();
+    r.onload=e=>res({name:file.name,size:file.size,dataUrl:e.target.result,isImage:true});
+    r.readAsDataURL(file);
+  });
+}
+async function addFiles(e){
+  const newData=await Promise.all(Array.from(e.target.files).map(readFileData));
+  uFileData=[...uFileData,...newData];
+  uFiles=uFileData.map(d=>({name:d.name,size:d.size}));
+  renderFilesNew(uFileData,'file-list','f');
+  updateQuote();
+}
+async function addDrawings(e){
+  const newData=await Promise.all(Array.from(e.target.files).map(readFileData));
+  uDrawingData=[...uDrawingData,...newData];
+  uDrawings=uDrawingData.map(d=>({name:d.name,size:d.size}));
+  renderFilesNew(uDrawingData,'draw-list','d');
+  updateQuote();
+}
+function rmFile(i,key){
+  if(key==='f'){uFileData.splice(i,1);uFiles=uFileData.map(d=>({name:d.name,size:d.size}));renderFilesNew(uFileData,'file-list','f');}
+  else{uDrawingData.splice(i,1);uDrawings=uDrawingData.map(d=>({name:d.name,size:d.size}));renderFilesNew(uDrawingData,'draw-list','d');}
+  updateQuote();
+}
+async function dropFiles(e){
+  e.preventDefault();document.getElementById('upload-zone').classList.remove('dragover');
+  const newData=await Promise.all(Array.from(e.dataTransfer.files).map(readFileData));
+  uFileData=[...uFileData,...newData];
+  uFiles=uFileData.map(d=>({name:d.name,size:d.size}));
+  renderFilesNew(uFileData,'file-list','f');
+  updateQuote();
+}
+function renderFilesNew(arr,containerId,key){
+  const el=document.getElementById(containerId);el.innerHTML='';
+  const imgs=arr.filter(d=>d.isImage);
+  const docs=arr.filter(d=>!d.isImage);
+  if(imgs.length>0){
+    const grid=document.createElement('div');grid.className='photo-grid';grid.style.marginTop='10px';
+    imgs.forEach((d,rawIdx)=>{
+      const idx=arr.indexOf(d);
+      const wrap=document.createElement('div');wrap.className='photo-thumb';
+      wrap.innerHTML=`<img src="${d.dataUrl}" alt="${d.name}" loading="lazy"/>
+        <span class="photo-label">${d.name}</span>
+        <button class="photo-del" onclick="rmFile(${idx},'${key}')" title="Remove">✕</button>`;
+      grid.appendChild(wrap);
+    });
+    el.appendChild(grid);
+  }
+  docs.forEach((d,rawIdx)=>{
+    const idx=arr.indexOf(d);
+    const ext=d.name.split('.').pop().toUpperCase();
+    const icons={PDF:'📄',DWG:'📐',DXF:'📐'};
+    const div=document.createElement('div');div.className='file-nonimage';
+    div.innerHTML=`<span style="font-size:18px">${icons[ext]||'📎'}</span><span class="fi-name">${d.name}</span><span style="color:var(--text3);font-size:11px;flex-shrink:0">${fmtSize(d.size)}</span><button class="fi-del" onclick="rmFile(${idx},'${key}')">✕</button>`;
+    el.appendChild(div);
+  });
+}
 
 /* ══ RESET ══ */
 function resetAll(){
   if(!confirm('Clear all quote data and start over?'))return;
   S={mat:'galvalume',alIdx:null,alOther:false,product:null,pw:30,pl:30,ptd:3.5,sameSides:true,ptdF:3.5,ptdB:3.5,ptdL:3.5,ptdR:3.5,sw:30,sl:30,std:3.5,addons:{},stormMat:'galv'};
-  uFiles=[];uDrawings=[];
+  uFiles=[];uDrawings=[];uFileData=[];uDrawingData=[];
   const def={pw:30,pl:30,ptd:3.5,sw:30,sl:30,std:3.5,'ptd-f':3.5,'ptd-b':3.5,'ptd-l':3.5,'ptd-r':3.5};
   Object.entries(def).forEach(([k,v])=>{const el=document.getElementById(k);if(el)el.value=v;});
   document.getElementById('same-sides').checked=true;
