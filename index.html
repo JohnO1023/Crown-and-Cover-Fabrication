@@ -514,7 +514,10 @@ label.cb-row {
   overflow: hidden;
   background: var(--bg3);
   border: 1px solid var(--border);
-  aspect-ratio: 1;
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  /* Fallback for browsers without aspect-ratio support */
+  min-height: 120px;
 }
 .photo-thumb img {
   width: 100%; height: 100%;
@@ -577,7 +580,9 @@ label.cb-row {
   .legal { color: #888; font-size: 10px; }
   .cfield label { color: #666; }
   /* Photo grid in print */
-  .photo-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .photo-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .photo-thumb { min-height: 180px; border: 1px solid #ccc; }
+  .photo-thumb img { width: 100% !important; height: 100% !important; object-fit: cover !important; display: block !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .photo-thumb { border: 1px solid #ccc; aspect-ratio: 1; }
   .photo-thumb .photo-del { display: none !important; }
   .photo-label { background: rgba(0,0,0,.45) !important; }
@@ -585,6 +590,8 @@ label.cb-row {
   .file-nonimage .fi-name { color: #333; }
   .file-nonimage .fi-del { display: none !important; }
   .photo-section .qm-hd { background: #f4f4f4; }
+  .photo-section { page-break-inside: avoid; }
+  .photo-grid { page-break-inside: avoid; }
   .photo-section .qm-title { color: #111; }
   .cfield input, .cfield textarea { border: 1px solid #ddd; background: #fff; color: #111; font-size: 13px; padding: 6px 8px; }
   .q-empty { color: #aaa; }
@@ -1085,7 +1092,8 @@ function updateQuote(){
     if(imgs.length>0){
       bd+=`<div class="photo-grid">`;
       imgs.forEach((d,i)=>{
-        bd+=`<div class="photo-thumb"><img src="${d.dataUrl}" alt="${d.name}" style="width:100%;height:100%;object-fit:cover;display:block;"/><span class="photo-label">${d.name}</span></div>`;
+        if(!d.dataUrl) return;
+        bd+=`<div class="photo-thumb"><img src="${d.dataUrl}" alt="${d.name}" style="width:100%;height:100%;object-fit:cover;display:block;" crossorigin="anonymous"/><span class="photo-label">${d.name}</span></div>`;
       });
       bd+=`</div>`;
     }
@@ -1151,13 +1159,17 @@ function renderFiles(arr,id,key){
     el.appendChild(d);
   });
 }
-const IMG_TYPES=['image/jpeg','image/jpg','image/png','image/heic','image/webp','image/gif'];
+const IMG_EXTS=['jpg','jpeg','png','gif','webp','heic','heif','bmp'];
+const IMG_TYPES=['image/jpeg','image/jpg','image/png','image/heic','image/heif','image/webp','image/gif','image/bmp'];
 function readFileData(file){
   return new Promise(res=>{
-    const isImg=IMG_TYPES.includes(file.type.toLowerCase());
+    // Check by mime type first, then fall back to extension (important for iPhone HEIC)
+    const ext=(file.name.split('.').pop()||'').toLowerCase();
+    const isImg=IMG_TYPES.includes(file.type.toLowerCase())||IMG_EXTS.includes(ext);
     if(!isImg){res({name:file.name,size:file.size,dataUrl:null,isImage:false});return;}
     const r=new FileReader();
     r.onload=e=>res({name:file.name,size:file.size,dataUrl:e.target.result,isImage:true});
+    r.onerror=()=>res({name:file.name,size:file.size,dataUrl:null,isImage:false});
     r.readAsDataURL(file);
   });
 }
