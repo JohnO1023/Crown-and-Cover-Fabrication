@@ -24,7 +24,10 @@ header span { font-size: 12px; opacity: 0.5; margin-left: auto; }
 .panel { background: #fff; border-radius: 10px; border: 1px solid #e2ddd6; overflow: hidden; }
 .panel-head { padding: 0.85rem 1.1rem; border-bottom: 1px solid #e2ddd6; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; display: flex; align-items: center; gap: 8px; }
 .panel-body { padding: 1.1rem; }
-#preview { width: 100%; border-radius: 6px; background: #111; aspect-ratio: 4/3; display: block; object-fit: cover; }
+.cam-wrap { position: relative; width: 100%; aspect-ratio: 4/3; border-radius: 6px; overflow: hidden; background: #111; margin-top: 0.75rem; }
+#preview { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+#guide-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.guide-hint { font-size: 11px; color: #aaa; text-align: center; margin-top: 6px; letter-spacing: 0.02em; }
 .scan-result { margin-top: 0.85rem; padding: 0.75rem 1rem; background: #f4f1ec; border-radius: 6px; font-size: 13px; color: #555; min-height: 48px; display: flex; flex-direction: column; gap: 4px; justify-content: center; }
 .scan-result .val { font-weight: 600; color: #1a1a18; font-size: 15px; }
 .scan-result .tool-detail { font-size: 12px; color: #666; }
@@ -94,7 +97,11 @@ button.small { padding: 0.3rem 0.65rem; font-size: 12px; }
       <div class="panel-head">Camera</div>
       <div class="panel-body">
         <select id="camera-select"><option>Loading cameras…</option></select>
-        <video id="preview" autoplay muted playsinline style="margin-top:0.75rem;"></video>
+        <div class="cam-wrap">
+          <video id="preview" autoplay muted playsinline></video>
+          <canvas id="guide-canvas"></canvas>
+        </div>
+        <div class="guide-hint">Align barcode inside the guide zone</div>
         <div class="scan-result" id="last-scan"><span>Waiting for scan…</span></div>
       </div>
     </div>
@@ -268,31 +275,178 @@ async function initCamera(){
     const devices = await codeReader.listVideoInputDevices();
     const sel = document.getElementById('camera-select');
     sel.innerHTML = '';
+    if(!devices.length){ sel.innerHTML='<option>No cameras found</option>'; return; }
     devices.forEach((d,i)=>{
       const o=document.createElement('option');
       o.value=d.deviceId; o.text=d.label||'Camera '+(i+1); sel.appendChild(o);
     });
-    if(devices.length){
-      const id=devices[devices.length>1?1:0].deviceId;
-      sel.value=id; startScan(id);
-    }
-    sel.onchange=()=>{ codeReader.reset(); startScan(sel.value); };
+    const id=devices[devices.length>1?1:0].deviceId;
+    sel.value=id; startScan(id);
+    sel.onchange=()=>{
+      const video=document.getElementById('preview');
+      if(video.srcObject) video.srcObject.getTracks().forEach(t=>t.stop());
+      if(scanIntervalId){ clearInterval(scanIntervalId); scanIntervalId=null; }
+      startScan(sel.value);
+    };
   } catch(e){
     document.getElementById('camera-select').innerHTML='<option>Camera unavailable</option>';
   }
 }
 
+let guideAnimFrame = null;
+let cropCanvas = null;
+let cropCtx = null;
+let scanIntervalId = null;
+let zxReader = null;
+
+function getZone(W, H){
+  const zW = Math.round(W * 0.78);
+  const zH = Math.round(H * 0.36);
+  return { zx: Math.round((W-zW)/2), zy: Math.round((H-zH)/2), zW, zH };
+}
+
+function drawCorner(ctx, cx, cy, dx, dy, t, r){
+  ctx.beginPath();
+  ctx.moveTo(cx + dx*(r+t), cy);
+  ctx.lineTo(cx + dx*r, cy);
+  ctx.arcTo(cx, cy, cx, cy + dy*r, r);
+  ctx.lineTo(cx, cy + dy*(r+t));
+  ctx.stroke();
+}
+
+function drawGuide(){
+  const gc = document.getElementById('guide-canvas');
+  const video = document.getElementById('preview');
+  if(!gc || !video) return;
+  const rect = video.getBoundingClientRect();
+  const W = Math.round(rect.width);
+  const H = Math.round(rect.height);
+  if(!W || !H){ guideAnimFrame = requestAnimationFrame(()=>drawGuide(flashAlpha)); return; }
+
+  const dpr = window.devicePixelRatio || 1;
+  gc.width = W * dpr;
+  gc.height = H * dpr;
+  gc.style.width = W + 'px';
+  gc.style.height = H + 'px';
+
+  const ctx = gc.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  const { zx, zy, zW, zH } = getZone(W, H);
+
+  ctx.fillStyle = 'rgba(0,0,0,0.52)';
+  ctx.fillRect(0, 0, W, zy);
+  ctx.fillRect(0, zy + zH, W, H - zy - zH);
+  ctx.fillRect(0, zy, zx, zH);
+  ctx.fillRect(zx + zW, zy, W - zx - zW, zH);
+
+  if(flashAlphaCur > 0){
+    ctx.strokeStyle = `rgba(80,210,80,${flashAlphaCur})`;
+    ctx.lineWidth = 2.5;
+    ctx.strokeRect(zx+1, zy+1, zW-2, zH-2);
+  }
+
+  const t = 20, r = 8;
+  ctx.strokeStyle = 'rgba(255,255,255,0.92)';
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  drawCorner(ctx, zx,    zy,     1,  1, t, r);
+  drawCorner(ctx, zx+zW, zy,    -1,  1, t, r);
+  drawCorner(ctx, zx,    zy+zH,  1, -1, t, r);
+  drawCorner(ctx, zx+zW, zy+zH, -1, -1, t, r);
+
+  const sweepFrac = (Date.now() % 1600) / 1600;
+  const scanY = zy + sweepFrac * zH;
+  const grad = ctx.createLinearGradient(zx, scanY-8, zx, scanY+8);
+  grad.addColorStop(0, 'rgba(255,255,255,0)');
+  grad.addColorStop(0.5, 'rgba(255,255,255,0.45)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(zx, scanY-8, zW, 16);
+
+  guideAnimFrame = requestAnimationFrame(drawGuide);
+}
+
+function getGuideZone(){
+  const video = document.getElementById('preview');
+  const rect = video.getBoundingClientRect();
+  const W = rect.width, H = rect.height;
+  const vW = video.videoWidth, vH = video.videoHeight;
+  if(!vW || !vH || !W || !H) return null;
+  const { zx, zy, zW, zH } = getZone(W, H);
+  const sx = vW / W, sy = vH / H;
+  return { sx: Math.round(zx*sx), sy: Math.round(zy*sy), sw: Math.round(zW*sx), sh: Math.round(zH*sy) };
+}
+
 function startScan(deviceId){
-  codeReader.decodeFromVideoDevice(deviceId, document.getElementById('preview'), (result)=>{
-    if(!result) return;
-    const val = result.getText();
-    if(val===lastScannedTag) return;
-    lastScannedTag=val;
-    setTimeout(()=>{ lastScannedTag=null; }, 2500);
-    document.getElementById('f-tag').value = val;
-    populateFromRegistry(val, true);
+  if(guideAnimFrame){ cancelAnimationFrame(guideAnimFrame); guideAnimFrame=null; }
+  if(scanIntervalId){ clearInterval(scanIntervalId); scanIntervalId=null; }
+  if(!cropCanvas){ cropCanvas = document.createElement('canvas'); cropCtx = cropCanvas.getContext('2d',{willReadFrequently:true}); }
+  if(!zxReader){ zxReader = new ZXing.BrowserMultiFormatReader(); }
+
+  const video = document.getElementById('preview');
+  const constraints = { video: { deviceId: {exact: deviceId}, width:{ideal:1280}, height:{ideal:960} } };
+
+  navigator.mediaDevices.getUserMedia(constraints).then(stream=>{
+    video.srcObject = stream;
+    video.onloadedmetadata = ()=>{
+      video.play().catch(()=>{});
+      drawGuide();
+
+      scanIntervalId = setInterval(()=>{
+        if(video.readyState < 2) return;
+        const zone = getGuideZone();
+        if(!zone || zone.sw < 10 || zone.sh < 10) return;
+        cropCanvas.width = zone.sw;
+        cropCanvas.height = zone.sh;
+        cropCtx.drawImage(video, zone.sx, zone.sy, zone.sw, zone.sh, 0, 0, zone.sw, zone.sh);
+        let imgData;
+        try { imgData = cropCtx.getImageData(0, 0, zone.sw, zone.sh); } catch(e){ return; }
+        try {
+          const lum = new ZXing.RGBLuminanceSource(imgData.data, zone.sw, zone.sh);
+          const bmp = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum));
+          const result = zxReader.decodeBitmap(bmp);
+          if(result){
+            const val = result.getText();
+            if(val === lastScannedTag) return;
+            lastScannedTag = val;
+            setTimeout(()=>{ lastScannedTag=null; }, 2500);
+            document.getElementById('f-tag').value = val;
+            populateFromRegistry(val, true);
+            triggerFlash();
+          }
+        } catch(e){}
+      }, 250);
+    };
+  }).catch(()=>{
+    codeReader.decodeFromVideoDevice(deviceId, video, (result)=>{
+      if(!result) return;
+      const val = result.getText();
+      if(val===lastScannedTag) return;
+      lastScannedTag=val;
+      setTimeout(()=>{ lastScannedTag=null; }, 2500);
+      document.getElementById('f-tag').value = val;
+      populateFromRegistry(val, true);
+    });
+    drawGuide();
   });
 }
+
+let flashAlphaCur = 0;
+function triggerFlash(){
+  flashAlphaCur = 0.85;
+  function fade(){
+    flashAlphaCur = Math.max(0, flashAlphaCur - 0.06);
+  }
+  const id = setInterval(()=>{ fade(); if(flashAlphaCur<=0) clearInterval(id); }, 30);
+}
+
+function flashGuide(){
+  triggerFlash();
+}
+
 
 function populateFromRegistry(tag, fromScan){
   const key = tag.trim().toUpperCase();
