@@ -1,1305 +1,471 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="C&C Quote">
-<title>Crown and Cover Fabrication — Quote Builder</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WilliamSmith Fireplaces — Tool Scanner</title>
+<script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <style>
-/* ─── TOKENS ─── */
-:root {
-  --bg:       #0e0f11;
-  --bg2:      #14161a;
-  --bg3:      #1c1f25;
-  --bg4:      #242830;
-  --border:   #2e3340;
-  --border2:  #3d4454;
-  --accent:   #e8521a;
-  --accent2:  #ff6b35;
-  --blue:     #2b7fff;
-  --teal:     #1aaa7a;
-  --amber:    #f0a500;
-  --red:      #e03c3c;
-  --text:     #e8eaf0;
-  --text2:    #9ba3b8;
-  --text3:    #5c6478;
-  --fh:       'Barlow Condensed', sans-serif;
-  --fb:       'Barlow', sans-serif;
-  --r:        6px;
-  --r2:       10px;
-  --safe-b:   env(safe-area-inset-bottom, 0px);
-  --safe-t:   env(safe-area-inset-top, 0px);
-  --nav-h:    56px;   /* top bar height */
-  --tab-h:    64px;   /* bottom tab bar */
-}
-
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html {
-background: var(–bg);
-color: var(–text);
-font-family: var(–fb);
-font-size: 15px;
-line-height: 1.5;
-height: 100%;
--webkit-text-size-adjust: 100%;
-}
-body {
-min-height: 100%;
-min-height: -webkit-fill-available;
-min-height: 100svh;
-overscroll-behavior: none;
-}
-
-/* ─── SCROLLBAR ─── */
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(–border2); border-radius: 2px; }
-
-/* ─── SHELL ─── */
-.app {
-display: flex;
-flex-direction: column;
-/* dvh = dynamic viewport height, accounts for Safari’s collapsible toolbar */
-height: 100dvh;
-/* Fallback chain for older Safari */
-height: -webkit-fill-available;
-height: 100svh;
-overflow: hidden;
-}
-
-/* ─── TOP BAR ─── */
-.topbar {
-flex-shrink: 0;
-background: var(–bg2);
-border-bottom: 1px solid var(–border);
-display: flex;
-align-items: center;
-justify-content: space-between;
-padding: 0 16px;
-padding-top: var(–safe-t);
-height: calc(var(–nav-h) + var(–safe-t));
-z-index: 50;
-}
-.topbar-left { display: flex; align-items: center; gap: 10px; }
-.logo-mark {
-width: 42px; height: 42px;
-background: var(–accent);
-border-radius: 8px;
-display: flex; align-items: center; justify-content: center;
-flex-shrink: 0;
-overflow: hidden;
-}
-.logo-mark svg { width: 32px; height: 32px; display: block; }
-.logo-text { line-height: 1.2; }
-.logo-name {
-font-family: var(–fh); font-weight: 700; font-size: 16px;
-letter-spacing: .04em; color: var(–text); text-transform: uppercase;
-}
-.logo-sub { font-size: 10px; color: var(–text3); letter-spacing: .07em; text-transform: uppercase; }
-.topbar-total {
-display: flex; flex-direction: column; align-items: flex-end;
-cursor: pointer; -webkit-tap-highlight-color: transparent;
-}
-.topbar-total-label { font-size: 10px; color: var(–text3); letter-spacing: .06em; text-transform: uppercase; }
-.topbar-total-val {
-font-family: var(–fh); font-weight: 800; font-size: 22px;
-color: var(–accent2); line-height: 1;
-}
-
-/* ─── SCROLL AREA ─── */
-.scroll-area {
-flex: 1;
-overflow-y: auto;
-overflow-x: hidden;
--webkit-overflow-scrolling: touch;
-overscroll-behavior-y: contain;
-}
-.content {
-padding: 16px;
-padding-bottom: calc(var(–tab-h) + max(var(–safe-b), 8px) + 32px);
-max-width: 860px;
-margin: 0 auto;
-}
-
-/* ─── PANELS ─── */
-.tool-panel { display: none; }
-.tool-panel.active { display: block; animation: fadeUp .18s ease; }
-@keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-
-/* ─── BOTTOM TAB BAR ─── */
-.bottomnav {
-flex-shrink: 0;
-background: var(–bg2);
-border-top: 1px solid var(–border);
-display: flex;
-align-items: stretch;
-padding-bottom: max(var(–safe-b), 8px);
-height: calc(var(–tab-h) + max(var(–safe-b), 8px));
-z-index: 100;
-overflow-x: auto;
-overflow-y: hidden;
-scrollbar-width: none;
--ms-overflow-style: none;
-/* Ensure it stays above Safari chrome */
-position: relative;
-}
-.bottomnav::-webkit-scrollbar { display: none; }
-.btab {
-flex: 1;
-min-width: 64px;
-max-width: 90px;
-display: flex;
-flex-direction: column;
-align-items: center;
-justify-content: center;
-gap: 3px;
-padding: 6px 4px 4px;
-border: none;
-background: transparent;
-cursor: pointer;
--webkit-tap-highlight-color: transparent;
-touch-action: manipulation;
-position: relative;
-transition: opacity .12s;
-/* Larger tap target */
-min-height: 44px;
-}
-.btab:active { opacity: .7; }
-.btab.active .btab-icon { color: var(–accent); }
-.btab.active .btab-label { color: var(–accent); }
-.btab.disabled { opacity: .38; pointer-events: none; }
-.btab-icon { font-size: 20px; line-height: 1; }
-.btab-label {
-font-family: var(–fh); font-weight: 600; font-size: 10px;
-letter-spacing: .04em; text-transform: uppercase;
-color: var(–text3); white-space: nowrap;
-transition: color .12s;
-}
-.btab.active::after {
-content: ‘’;
-position: absolute;
-top: 0; left: 20%; right: 20%;
-height: 2px;
-background: var(–accent);
-border-radius: 0 0 2px 2px;
-}
-.btab-soon {
-position: absolute; top: 4px; right: 6px;
-font-size: 8px; font-weight: 700; letter-spacing: .03em;
-background: var(–bg4); color: var(–text3);
-border: 1px solid var(–border); border-radius: 3px;
-padding: 1px 4px; line-height: 1.4; text-transform: uppercase;
-}
-
-/* ─── SECTIONS ─── */
-.section {
-background: var(–bg2);
-border: 1px solid var(–border);
-border-radius: var(–r2);
-padding: 14px 16px;
-margin-bottom: 14px;
-}
-.section.pan-s { border-left: 3px solid var(–blue); }
-.section.shr-s { border-left: 3px solid var(–teal); }
-.sec-hd { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
-.sec-badge {
-font-family: var(–fh); font-weight: 700; font-size: 11px;
-letter-spacing: .1em; text-transform: uppercase;
-padding: 3px 10px; border-radius: 3px;
-}
-.bb { background: rgba(43,127,255,.15); color: #6ba7ff; border: 1px solid rgba(43,127,255,.3); }
-.bt { background: rgba(26,170,122,.15); color: #3dd6a0; border: 1px solid rgba(26,170,122,.3); }
-.sec-title {
-font-family: var(–fh); font-weight: 700; font-size: 16px;
-letter-spacing: .05em; text-transform: uppercase; color: var(–text);
-}
-.sec-lbl {
-font-size: 10px; font-weight: 600; letter-spacing: .1em;
-text-transform: uppercase; color: var(–text3);
-margin: 14px 0 8px;
-}
-.sec-lbl:first-child { margin-top: 0; }
-
-/* ─── MATERIAL TABS (scrollable row) ─── */
-.mat-row {
-display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px;
-margin-bottom: 14px; scrollbar-width: none;
-}
-.mat-row::-webkit-scrollbar { display: none; }
-.mat-btn {
-flex-shrink: 0;
-padding: 9px 16px;
-border-radius: var(–r);
-border: 1px solid var(–border);
-background: var(–bg3);
-color: var(–text2);
-font-family: var(–fh); font-weight: 600; font-size: 13px;
-letter-spacing: .04em; text-transform: uppercase;
-cursor: pointer; white-space: nowrap;
--webkit-tap-highlight-color: transparent;
-transition: all .12s;
-}
-.mat-btn.active { background: var(–accent); border-color: var(–accent); color: #fff; }
-
-/* ─── PRODUCT GRID ─── */
-.pg { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-.pg.pg3 { grid-template-columns: repeat(3, 1fr); }
-@media (min-width: 540px) {
-.pg { grid-template-columns: repeat(3, 1fr); }
-.pg.pg4 { grid-template-columns: repeat(4, 1fr); }
-}
-.pb {
-background: var(–bg3);
-border: 1px solid var(–border);
-border-radius: var(–r);
-padding: 10px 12px;
-cursor: pointer; text-align: left;
--webkit-tap-highlight-color: transparent;
-touch-action: manipulation;
-transition: border-color .1s, background .1s;
-min-height: 56px;
-}
-.pb.sel { border: 2px solid var(–blue); background: rgba(43,127,255,.1); }
-.pb .pn { font-size: 10px; color: var(–text3); font-family: var(–fh); letter-spacing: .04em; }
-.pb .pm { font-family: var(–fh); font-size: 13px; font-weight: 600; color: var(–text); margin-top: 2px; line-height: 1.2; }
-.pb.sel .pm { color: #6ba7ff; }
-.pb .ps { font-size: 11px; color: var(–text3); margin-top: 3px; }
-
-/* ─── FIELD ROWS ─── */
-.fr { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-.fl { font-size: 13px; color: var(–text2); min-width: 130px; max-width: 140px; flex-shrink: 0; line-height: 1.3; }
-.fr input[type=number],
-.fr input[type=text],
-.fr select,
-.fr textarea {
-flex: 1; min-width: 0;
-background: var(–bg3);
-border: 1px solid var(–border);
-border-radius: var(–r);
-color: var(–text);
-padding: 10px 12px;
-font-family: var(–fb); font-size: 16px; /* 16px prevents iOS zoom */
-outline: none;
--webkit-appearance: none;
-appearance: none;
-}
-.fr input:focus, .fr select:focus, .fr textarea:focus { border-color: var(–blue); }
-.fr select { background-image: url(“data:image/svg+xml,%3Csvg xmlns=‘http://www.w3.org/2000/svg’ width=‘12’ height=‘8’ viewBox=‘0 0 12 8’%3E%3Cpath d=‘M1 1l5 5 5-5’ stroke=’%235c6478’ stroke-width=‘1.5’ fill=‘none’ stroke-linecap=‘round’/%3E%3C/svg%3E”); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
-.fr select option { background: #1c1f25; }
-.fr input[type=checkbox] { accent-color: var(–blue); width: 18px; height: 18px; flex-shrink: 0; cursor: pointer; }
-label.cb-row {
-display: flex; align-items: center; gap: 10px;
-font-size: 14px; color: var(–text2); cursor: pointer;
--webkit-tap-highlight-color: transparent;
-padding: 8px 0;
-}
-
-/* ─── DIMS LAYOUT ─── */
-.dims-wrap { display: flex; flex-direction: column; gap: 0; }
-.dims-col { }
-.dims-col-title {
-font-family: var(–fh); font-size: 11px; font-weight: 700;
-letter-spacing: .1em; text-transform: uppercase; color: var(–text3);
-margin-bottom: 8px; margin-top: 12px;
-}
-.dims-col-title:first-child { margin-top: 0; }
-.dims-divider { height: 1px; background: var(–border); margin: 14px 0; }
-@media (min-width: 640px) {
-.dims-wrap { flex-direction: row; gap: 20px; }
-.dims-col { flex: 1; }
-.dims-divider { width: 1px; height: auto; margin: 0; }
-}
-
-/* ─── ADDONS ─── */
-.addon-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-@media (min-width: 480px) { .addon-grid { grid-template-columns: repeat(3, 1fr); } }
-.addon-btn {
-background: var(–bg3);
-border: 1px solid var(–border);
-border-radius: var(–r);
-padding: 10px 12px;
-display: flex; align-items: center; gap: 8px;
-font-size: 13px; color: var(–text2);
-cursor: pointer;
--webkit-tap-highlight-color: transparent;
-touch-action: manipulation;
-transition: all .1s;
-}
-.addon-btn.sel { border-color: var(–blue); background: rgba(43,127,255,.1); color: var(–text); }
-
-/* ─── BANNERS ─── */
-.banner {
-border-radius: var(–r); padding: 10px 13px; font-size: 13px;
-margin-top: 8px; display: flex; align-items: flex-start; gap: 8px;
-line-height: 1.5;
-}
-.bi { flex-shrink: 0; font-size: 15px; margin-top: 1px; }
-.bwarn { background: rgba(240,165,0,.12); border: 1px solid rgba(240,165,0,.35); color: #f5c842; }
-.bdanger { background: rgba(224,60,60,.12); border: 1px solid rgba(224,60,60,.35); color: #f08080; }
-.binfo { background: rgba(43,127,255,.12); border: 1px solid rgba(43,127,255,.3); color: #6ba7ff; }
-.bok { background: rgba(26,170,122,.12); border: 1px solid rgba(26,170,122,.35); color: #3dd6a0; }
-
-/* ─── DIM DISPLAY ─── */
-.dd {
-background: var(–bg); border: 1px solid var(–border);
-border-radius: var(–r); padding: 9px 12px;
-font-size: 12px; color: var(–text3); margin-top: 8px;
-font-family: var(–fh); letter-spacing: .03em; line-height: 1.7;
-}
-.dd span { color: var(–text); font-weight: 600; }
-.dd .hi { color: var(–accent2); }
-
-/* ─── SWATCHES ─── */
-.sw-palette { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.sw-wrap { display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.sw { width: 36px; height: 36px; border-radius: 6px; border: 2px solid transparent; transition: border-color .12s; }
-.sw.sel { border-color: var(–accent); outline: 2px solid rgba(232,82,26,.35); }
-.sw-lbl { font-size: 9px; color: var(–text3); text-align: center; width: 42px; line-height: 1.3; }
-.color-chosen {
-display: flex; align-items: center; gap: 8px;
-background: var(–bg3); border: 1px solid var(–border2);
-border-radius: var(–r); padding: 9px 12px;
-font-size: 13px; color: var(–text2); margin-top: 8px;
-}
-.cdot { width: 18px; height: 18px; border-radius: 3px; flex-shrink: 0; border: 1px solid rgba(255,255,255,.12); }
-
-/* ─── FILES ─── */
-.upload-zone {
-border: 2px dashed var(–border2); border-radius: var(–r2);
-padding: 2rem; text-align: center; cursor: pointer;
-background: var(–bg3); -webkit-tap-highlight-color: transparent;
-transition: border-color .15s, background .15s;
-}
-.upload-zone.dragover { border-color: var(–accent); background: rgba(232,82,26,.05); }
-.uz-icon { font-size: 30px; display: block; margin-bottom: 10px; }
-.uz-title { font-family: var(–fh); font-weight: 700; font-size: 15px; letter-spacing: .04em; text-transform: uppercase; color: var(–text); margin-bottom: 5px; }
-.uz-sub { font-size: 12px; color: var(–text3); }
-.file-item {
-display: flex; align-items: center; gap: 10px;
-background: var(–bg3); border: 1px solid var(–border);
-border-radius: var(–r); padding: 10px 12px;
-margin-top: 8px; font-size: 13px;
-}
-.fi-icon { font-size: 18px; flex-shrink: 0; }
-.fi-name { flex: 1; color: var(–text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fi-size { color: var(–text3); font-size: 11px; flex-shrink: 0; }
-.fi-del {
-background: none; border: none; color: var(–text3);
-cursor: pointer; font-size: 18px; padding: 4px 6px;
--webkit-tap-highlight-color: transparent; flex-shrink: 0;
-border-radius: 4px;
-}
-.note-area {
-width: 100%; background: var(–bg3); border: 1px solid var(–border);
-border-radius: var(–r); color: var(–text);
-padding: 10px 12px; font-family: var(–fb); font-size: 16px;
-outline: none; resize: vertical; min-height: 80px; margin-top: 10px;
--webkit-appearance: none;
-}
-.note-area:focus { border-color: var(–blue); }
-
-/* ─── COMING SOON ─── */
-.cs {
-display: flex; flex-direction: column; align-items: center;
-justify-content: center; min-height: 50vh;
-gap: 12px; text-align: center; padding: 2rem;
-}
-.cs-icon { font-size: 44px; opacity: .25; }
-.cs-title {
-font-family: var(–fh); font-size: 26px; font-weight: 800;
-letter-spacing: .08em; text-transform: uppercase; color: var(–text3);
-}
-.cs-sub { font-size: 14px; color: var(–text3); max-width: 300px; line-height: 1.6; }
-.cs-badge {
-font-family: var(–fh); font-size: 11px; font-weight: 700;
-letter-spacing: .1em; text-transform: uppercase;
-padding: 5px 14px; border: 1px solid var(–border2);
-border-radius: var(–r); color: var(–text3); background: var(–bg3);
-}
-
-/* ─── QUOTE PAGE ─── */
-.q-module {
-background: var(–bg2); border: 1px solid var(–border);
-border-radius: var(–r2); margin-bottom: 12px; overflow: hidden;
-}
-.qm-hd {
-display: flex; align-items: center; justify-content: space-between;
-padding: 12px 14px; background: var(–bg3);
-border-bottom: 1px solid var(–border);
-}
-.qm-title {
-font-family: var(–fh); font-weight: 700; font-size: 14px;
-letter-spacing: .06em; text-transform: uppercase; color: var(–text);
-}
-.qm-sub { font-family: var(–fh); font-weight: 700; font-size: 16px; color: var(–accent2); }
-.qm-body { padding: 10px 14px; }
-.ql { display: flex; justify-content: space-between; align-items: baseline; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,.04); font-size: 13px; color: var(–text2); gap: 10px; }
-.ql:last-child { border-bottom: none; }
-.ql .ll { flex: 1; }
-.ql .lv { font-family: var(–fh); font-weight: 600; color: var(–text); white-space: nowrap; }
-.ql.note { font-size: 11px; color: var(–text3); padding: 3px 0; font-style: italic; }
-.ql.note .lv { display: none; }
-.q-empty { padding: 1.5rem; text-align: center; color: var(–text3); font-size: 13px; font-style: italic; }
-
-/* ─── TOTALS BLOCK ─── */
-.totals-block {
-background: var(–bg2); border: 1px solid var(–border);
-border-radius: var(–r2); padding: 16px;
-margin-bottom: 12px;
-}
-.tt { font-family: var(–fh); font-weight: 800; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(–text3); margin-bottom: 12px; }
-.tr { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0; }
-.tr .trl { font-size: 13px; color: var(–text3); }
-.tr .trv { font-family: var(–fh); font-weight: 600; font-size: 14px; color: var(–text2); }
-.grand {
-display: flex; justify-content: space-between; align-items: center;
-background: var(–bg); border: 1px solid var(–border2);
-border-radius: var(–r); padding: 14px 16px; margin-top: 12px;
-}
-.g-label { font-family: var(–fh); font-weight: 700; font-size: 13px; letter-spacing: .07em; text-transform: uppercase; color: var(–text2); }
-.g-note { font-size: 11px; color: var(–text3); margin-top: 3px; }
-.g-val { font-family: var(–fh); font-weight: 800; font-size: 30px; color: var(–accent2); line-height: 1; }
-.divider { height: 1px; background: var(–border); margin: 12px 0; }
-
-/* ─── BUTTONS ─── */
-.btn {
-display: block; width: 100%;
-padding: 13px 18px;
-border-radius: var(–r);
-font-family: var(–fh); font-weight: 700; font-size: 14px;
-letter-spacing: .06em; text-transform: uppercase;
-cursor: pointer; border: none; text-align: center;
--webkit-tap-highlight-color: transparent;
-touch-action: manipulation;
-transition: opacity .12s;
-margin-bottom: 8px;
-}
-.btn:active { opacity: .8; }
-.btn-p { background: var(–accent); color: #fff; }
-.btn-o { background: transparent; color: var(–text2); border: 1px solid var(–border2); }
-
-/* ─── CUSTOMER FIELDS ─── */
-.cust-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
-@media (min-width: 480px) { .cust-grid { grid-template-columns: 1fr 1fr; } }
-.cfield { display: flex; flex-direction: column; gap: 5px; }
-.cfield label { font-size: 11px; color: var(–text3); letter-spacing: .07em; text-transform: uppercase; font-weight: 600; }
-.cfield input, .cfield textarea {
-background: var(–bg3); border: 1px solid var(–border);
-border-radius: var(–r); color: var(–text);
-padding: 10px 12px; font-family: var(–fb); font-size: 16px;
-outline: none; -webkit-appearance: none;
-}
-.cfield input:focus, .cfield textarea:focus { border-color: var(–blue); }
-.cfield.full { grid-column: 1 / -1; }
-.cfield textarea { resize: vertical; min-height: 64px; }
-
-/* ─── LEGAL NOTE ─── */
-.legal { font-size: 11px; color: var(–text3); line-height: 1.7; padding-top: 12px; border-top: 1px solid var(–border); margin-top: 12px; }
-/* ─── PHOTO GRID (quote page + print) ─── */
-.photo-section { margin-top: 0; }
-.photo-grid {
-display: grid;
-grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-gap: 10px;
-margin-top: 10px;
-}
-.photo-thumb {
-position: relative;
-border-radius: var(–r);
-overflow: hidden;
-background: var(–bg3);
-border: 1px solid var(–border);
-aspect-ratio: 1 / 1;
-width: 100%;
-min-height: 120px;
-}
-.photo-thumb img {
-width: 100%; height: 100%;
-object-fit: cover;
-object-position: center;
-display: block;
--webkit-print-color-adjust: exact;
-print-color-adjust: exact;
-}
-.photo-thumb .photo-label {
-position: absolute; bottom: 0; left: 0; right: 0;
-background: rgba(0,0,0,.6);
-color: #fff; font-size: 10px;
-padding: 3px 6px;
-overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.photo-thumb .photo-del {
-position: absolute; top: 4px; right: 4px;
-background: rgba(0,0,0,.6); border: none;
-color: #fff; font-size: 14px; border-radius: 50%;
-width: 22px; height: 22px; cursor: pointer;
-display: flex; align-items: center; justify-content: center;
--webkit-tap-highlight-color: transparent;
-}
-.file-nonimage {
-display: flex; align-items: center; gap: 8px;
-background: var(–bg3); border: 1px solid var(–border);
-border-radius: var(–r); padding: 10px 12px;
-margin-top: 8px; font-size: 13px;
-}
-.file-nonimage .fi-name { flex:1; color:var(–text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.file-nonimage .fi-del { background:none; border:none; color:var(–text3); cursor:pointer; font-size:16px; padding:2px 6px; }
-.no-print { /* hidden in print via @media print */ }
-
-/* ─── PRINT ─── */
-@media print {
-.topbar, .bottomnav, .no-print, .btn-o, .section.pan-s .dd,
-.section.shr-s .dd, #pan-os, #pan-ok, #sh-os, #sh-ok,
-.banner { display: none !important; }
-.scroll-area { overflow: visible; height: auto; }
-.content { padding: 0; max-width: 100%; }
-.tool-panel { display: none !important; }
-#tab-quote { display: block !important; }
-.app { height: auto; overflow: visible; }
-body, html { background: #fff; color: #000; font-size: 13px; }
-.section { background: #fff; border: 1px solid #ddd; margin-bottom: 12px; }
-.q-module { background: #fff; border: 1px solid #ddd; margin-bottom: 10px; page-break-inside: avoid; }
-.totals-block { background: #fff; border: 1px solid #ddd; page-break-inside: avoid; }
-.qm-hd { background: #f4f4f4; border-bottom: 1px solid #ddd; }
-.qm-title { color: #111; font-size: 12px; }
-.qm-sub { color: #333; }
-.ql { color: #333; border-bottom-color: #eee; }
-.ql .ll { color: #444; }
-.ql .lv { color: #111; }
-.ql.note { color: #888; }
-.tr .trl { color: #555; }
-.tr .trv { color: #111; }
-.grand { background: #f9f9f9; border: 1px solid #ccc; }
-.g-label { color: #333; }
-.g-val { color: #c44010; font-size: 24px; }
-.g-note { color: #888; }
-.tt { color: #333; }
-.legal { color: #888; font-size: 10px; }
-.cfield label { color: #666; }
-/* Photo grid in print — allow grid to split across pages, not individual photos */
-.photo-section { page-break-inside: auto; }
-.photo-section .qm-hd { background: #f4f4f4; page-break-inside: avoid; }
-.photo-section .qm-title { color: #111; }
-.photo-grid {
-display: grid !important;
-grid-template-columns: repeat(3, 1fr) !important;
-gap: 12px !important;
-page-break-inside: auto !important;
-margin-top: 10px !important;
-}
-.photo-thumb {
-break-inside: avoid !important;
-page-break-inside: avoid !important;
-height: 200px !important;
-min-height: 200px !important;
-max-height: 200px !important;
-aspect-ratio: unset !important;
-border: 1px solid #ccc !important;
-border-radius: 4px !important;
-overflow: hidden !important;
-background: #f5f5f5 !important;
-position: relative !important;
-display: block !important;
-}
-.photo-thumb img {
-width: 100% !important;
-height: 100% !important;
-object-fit: cover !important;
-object-position: center !important;
-display: block !important;
--webkit-print-color-adjust: exact !important;
-print-color-adjust: exact !important;
-}
-.photo-thumb .photo-del { display: none !important; }
-.photo-label {
-position: absolute !important;
-bottom: 0 !important; left: 0 !important; right: 0 !important;
-background: rgba(0,0,0,0.6) !important;
-color: #fff !important;
-font-size: 9px !important;
-padding: 4px 6px !important;
--webkit-print-color-adjust: exact !important;
-print-color-adjust: exact !important;
-white-space: nowrap !important;
-overflow: hidden !important;
-text-overflow: ellipsis !important;
-}
-.file-nonimage { border: 1px solid #ddd !important; background: #fff !important; }
-.file-nonimage .fi-name { color: #333 !important; }
-.file-nonimage .fi-del { display: none !important; }
-.cfield input, .cfield textarea { border: 1px solid #ddd; background: #fff; color: #111; font-size: 13px; padding: 6px 8px; }
-.q-empty { color: #aaa; }
-/* Print header */
-.print-header { display: flex !important; align-items: center; gap: 14px; margin-bottom: 20px; padding-bottom: 14px; border-bottom: 2px solid #e8521a; }
-.print-logo { width: 48px; height: 48px; background: #e8521a; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
-.print-logo svg { width: 36px; height: 36px; }
-.print-company { font-family: ‘Barlow Condensed’, sans-serif; }
-.print-company-name { font-size: 20px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: #111; line-height: 1; }
-.print-company-sub { font-size: 11px; color: #888; letter-spacing: .08em; text-transform: uppercase; }
-.sec-title { color: #111; }
-.cust-grid { grid-template-columns: 1fr 1fr; }
-}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f4f1ec; color: #1a1a18; min-height: 100vh; }
+header { background: #1a1a18; color: #f4f1ec; padding: 1rem 1.5rem; display: flex; align-items: center; gap: 12px; }
+header h1 { font-size: 15px; font-weight: 500; letter-spacing: 0.03em; }
+header span { font-size: 12px; opacity: 0.5; margin-left: auto; }
+.tabs { display: flex; background: #1a1a18; padding: 0 1.5rem; border-bottom: 1px solid #333; }
+.tab { padding: 0.6rem 1.2rem; font-size: 13px; color: #aaa; cursor: pointer; border-bottom: 2px solid transparent; transition: color 0.15s; user-select: none; }
+.tab:hover { color: #f4f1ec; }
+.tab.active { color: #f4f1ec; border-bottom-color: #f4f1ec; }
+.page { display: none; }
+.page.active { display: block; }
+.layout { display: grid; grid-template-columns: 340px 1fr; gap: 1.5rem; padding: 1.5rem; max-width: 1200px; margin: 0 auto; }
+@media (max-width: 700px) { .layout { grid-template-columns: 1fr; } }
+.panel { background: #fff; border-radius: 10px; border: 1px solid #e2ddd6; overflow: hidden; }
+.panel-head { padding: 0.85rem 1.1rem; border-bottom: 1px solid #e2ddd6; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #888; display: flex; align-items: center; gap: 8px; }
+.panel-body { padding: 1.1rem; }
+#preview { width: 100%; border-radius: 6px; background: #111; aspect-ratio: 4/3; display: block; object-fit: cover; }
+.scan-result { margin-top: 0.85rem; padding: 0.75rem 1rem; background: #f4f1ec; border-radius: 6px; font-size: 13px; color: #555; min-height: 48px; display: flex; flex-direction: column; gap: 4px; justify-content: center; }
+.scan-result .val { font-weight: 600; color: #1a1a18; font-size: 15px; }
+.scan-result .tool-detail { font-size: 12px; color: #666; }
+.scan-result .unregistered { font-size: 11px; color: #e24b4a; font-style: italic; }
+.controls { display: flex; gap: 8px; margin-top: 0.85rem; }
+button { padding: 0.55rem 1rem; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid #d0c9c0; background: #fff; color: #1a1a18; transition: background 0.15s; }
+button:hover { background: #f4f1ec; }
+button.primary { background: #1a1a18; color: #f4f1ec; border-color: #1a1a18; }
+button.primary:hover { background: #333; }
+button.danger { border-color: #e24b4a; color: #a32d2d; }
+button.danger:hover { background: #fcebeb; }
+button.small { padding: 0.3rem 0.65rem; font-size: 12px; }
+.field-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 0.85rem; }
+.field-row label { font-size: 12px; color: #888; font-weight: 500; }
+.field-row input, .field-row select { padding: 0.5rem 0.75rem; border: 1px solid #d0c9c0; border-radius: 6px; font-size: 13px; background: #fff; color: #1a1a18; }
+.field-row input:focus, .field-row select:focus { outline: 2px solid #1a1a18; outline-offset: 1px; }
+.tool-match-card { background: #f0f7ec; border-radius: 6px; padding: 0.75rem 1rem; margin-bottom: 0.85rem; border-left: 3px solid #3b6d11; display: none; }
+.tool-match-card.visible { display: block; }
+.tool-match-card .tm-name { font-weight: 600; font-size: 14px; color: #1a1a18; }
+.tool-match-card .tm-meta { font-size: 12px; color: #666; margin-top: 3px; }
+.log-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.log-table th { text-align: left; padding: 0.5rem 0.75rem; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #888; border-bottom: 1px solid #e2ddd6; }
+.log-table td { padding: 0.6rem 0.75rem; border-bottom: 1px solid #f0ece6; vertical-align: middle; }
+.log-table tr:last-child td { border-bottom: none; }
+.log-table tr:hover td { background: #faf8f5; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.badge-in { background: #eaf3de; color: #3b6d11; }
+.badge-out { background: #faeeda; color: #854f0b; }
+.badge-check { background: #e6f1fb; color: #185fa5; }
+.badge-type { background: #f4f1ec; color: #555; border: 1px solid #e2ddd6; font-weight: 500; }
+.empty { padding: 2rem; text-align: center; color: #aaa; font-size: 13px; }
+.toolbar { display: flex; gap: 8px; padding: 0.85rem 1.1rem; border-top: 1px solid #e2ddd6; align-items: center; flex-wrap: wrap; }
+.toolbar .count { font-size: 12px; color: #888; margin-right: auto; }
+.flash { animation: flashbg 0.6s ease; }
+@keyframes flashbg { 0% { background: #d6edca; } 100% { background: #f4f1ec; } }
+#camera-select { font-size: 12px; padding: 0.3rem 0.5rem; border: 1px solid #d0c9c0; border-radius: 5px; background: #fff; color: #1a1a18; max-width: 220px; }
+.registry-page { padding: 1.5rem; max-width: 1200px; margin: 0 auto; }
+.registry-grid { display: grid; grid-template-columns: 360px 1fr; gap: 1.5rem; }
+@media (max-width: 700px) { .registry-grid { grid-template-columns: 1fr; } }
+.asset-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.asset-table th { text-align: left; padding: 0.5rem 0.75rem; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #888; border-bottom: 1px solid #e2ddd6; }
+.asset-table td { padding: 0.6rem 0.75rem; border-bottom: 1px solid #f0ece6; vertical-align: middle; }
+.asset-table tr:last-child td { border-bottom: none; }
+.asset-table tr:hover td { background: #faf8f5; }
+.type-pill { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; background: #f4f1ec; color: #555; border: 1px solid #e2ddd6; }
+#r-msg { font-size: 12px; margin-top: 0.5rem; color: #3b6d11; display: none; }
 </style>
-
 </head>
 <body>
-<div class="app">
 
-<!-- ══ TOP BAR ══ -->
-
-<header class="topbar">
-  <div class="topbar-left">
-    <div class="logo-mark"><svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- chimney base -->
-  <rect x="18" y="44" width="28" height="16" rx="2" fill="white" opacity="0.9"/>
-  <rect x="14" y="40" width="36" height="7" rx="1.5" fill="white" opacity="0.95"/>
-  <!-- chimney flue holes -->
-  <rect x="23" y="47" width="5" height="7" rx="1" fill="#e8521a"/>
-  <rect x="36" y="47" width="5" height="7" rx="1" fill="#e8521a"/>
-  <!-- lion body sitting -->
-  <ellipse cx="32" cy="33" rx="11" ry="9" fill="white" opacity="0.95"/>
-  <!-- lion head -->
-  <circle cx="32" cy="22" r="9" fill="white" opacity="0.95"/>
-  <!-- mane -->
-  <ellipse cx="32" cy="22" rx="12" ry="11" fill="white" opacity="0.5"/>
-  <!-- lion face details -->
-  <circle cx="29" cy="20" r="1.5" fill="#e8521a"/>
-  <circle cx="35" cy="20" r="1.5" fill="#e8521a"/>
-  <path d="M29 24 Q32 26.5 35 24" stroke="#e8521a" stroke-width="1.2" fill="none" stroke-linecap="round"/>
-  <!-- nose -->
-  <ellipse cx="32" cy="23" rx="1.5" ry="1" fill="#e8521a" opacity="0.8"/>
-  <!-- ears -->
-  <path d="M23 15 L26 20 L20 19 Z" fill="white" opacity="0.9"/>
-  <path d="M41 15 L38 20 L44 19 Z" fill="white" opacity="0.9"/>
-  <!-- tail -->
-  <path d="M43 36 Q50 32 48 26 Q47 23 44 25" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.85"/>
-  <!-- paws -->
-  <ellipse cx="25" cy="40" rx="4" ry="2.5" fill="white" opacity="0.9"/>
-  <ellipse cx="39" cy="40" rx="4" ry="2.5" fill="white" opacity="0.9"/>
-</svg></div>
-    <div class="logo-text">
-      <div class="logo-name">Crown &amp; Cover Fabrication</div>
-      <div class="logo-sub">Quote Builder</div>
-    </div>
-  </div>
-  <div class="topbar-total" onclick="goTab('quote')">
-    <span class="topbar-total-label">Estimate</span>
-    <span class="topbar-total-val" id="hdr-total">$0.00</span>
-  </div>
+<header>
+  <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><rect x="1" y="1" width="3" height="16" rx="1" fill="#f4f1ec"/><rect x="6" y="1" width="1.5" height="16" rx="0.5" fill="#f4f1ec"/><rect x="9.5" y="1" width="2.5" height="16" rx="0.5" fill="#f4f1ec"/><rect x="14" y="1" width="1" height="16" rx="0.5" fill="#f4f1ec"/><rect x="16" y="1" width="1" height="16" rx="0.5" fill="#f4f1ec"/></svg>
+  <h1>WilliamSmith Fireplaces — Tool Scanner</h1>
+  <span id="clock"></span>
 </header>
 
-<!-- ══ SCROLL AREA ══ -->
-
-<div class="scroll-area" id="scroll-area">
-<div class="content">
-
-<!-- ── FAB PRICING ── -->
-
-<div class="tool-panel active" id="tab-fab">
-
-  <div class="section">
-    <div class="sec-hd"><div class="sec-title">Material</div></div>
-    <div class="mat-row">
-      <button class="mat-btn active" data-mat="galvalume" onclick="setMat('galvalume')">Galvalume</button>
-      <button class="mat-btn" data-mat="aluminum" onclick="setMat('aluminum')">Custom Aluminum</button>
-      <button class="mat-btn" data-mat="stainless" onclick="setMat('stainless')">Stainless Steel</button>
-      <button class="mat-btn" data-mat="copper" onclick="setMat('copper')">Copper</button>
-    </div>
-    <div id="al-panel" style="display:none;">
-      <div class="sec-lbl" style="margin-top:4px;">Select color</div>
-      <div class="sw-palette" id="sw-palette"></div>
-      <div id="other-fields" style="display:none;margin-top:12px;">
-        <div class="fr"><span class="fl">Fabricator</span><input type="text" id="fab-name" placeholder="e.g. Jet Metals"/></div>
-        <div class="fr"><span class="fl">Color / code</span><input type="text" id="color-code" placeholder="e.g. Dark Bronze 025"/></div>
-      </div>
-      <div id="color-chosen" class="color-chosen" style="display:none;"></div>
-    </div>
-    <div id="copper-warn" class="banner bwarn" style="display:none;"><span class="bi">⚠</span><span>Copper prices vary weekly — this is a baseline estimate only. Call for confirmed quote. Valid 1 week.</span></div>
-    <div id="copper-dis" class="banner bdanger" style="display:none;"><span class="bi">✕</span><span>Dissimilar metals warning: Copper reacts galvanically with steel, aluminum, and galvalume. All fasteners and adjacent flashing must be copper or stainless steel.</span></div>
-  </div>
-
-  <!-- CHASE PAN -->
-
-  <div class="section pan-s">
-    <div class="sec-hd"><span class="sec-badge bb">Chase Pan / Cover</span></div>
-    <div class="dims-wrap">
-      <div class="dims-col">
-        <div class="dims-col-title">Opening size</div>
-        <div class="fr"><span class="fl">Width (in)</span><input type="number" id="pw" value="30" min="1" max="240" step="0.125" inputmode="decimal" oninput="S.pw=+this.value||0;calcAndRender()"/></div>
-        <div class="fr"><span class="fl">Length (in)</span><input type="number" id="pl" value="30" min="1" max="240" step="0.125" inputmode="decimal" oninput="S.pl=+this.value||0;calcAndRender()"/></div>
-      </div>
-      <div class="dims-divider"></div>
-      <div class="dims-col">
-        <div class="dims-col-title">Turndown <span style="font-weight:400;color:var(--text3);">— first 2" free</span></div>
-        <div class="fr"><span class="fl">Depth (in)</span><input type="number" id="ptd" value="3.5" min="0" max="24" step="0.5" inputmode="decimal" oninput="S.ptd=+this.value||0;calcAndRender()"/></div>
-        <label class="cb-row">
-          <input type="checkbox" id="same-sides" checked onchange="S.sameSides=this.checked;document.getElementById('asym-tds').style.display=S.sameSides?'none':'block';calcAndRender()"/>
-          <span>Uniform all sides</span>
-        </label>
-      </div>
-    </div>
-    <div id="asym-tds" style="display:none;margin-top:4px;">
-      <div class="dims-divider"></div>
-      <div class="dims-col-title">Per-side turndown depths</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-        <div class="fr" style="flex-direction:column;align-items:flex-start;gap:4px;"><span class="fl" style="width:auto;font-size:11px;color:var(--text3);">FRONT</span><input type="number" id="ptd-f" value="3.5" min="0" max="24" step="0.5" inputmode="decimal" style="width:100%;" oninput="S.ptdF=+this.value||0;calcAndRender()"/></div>
-        <div class="fr" style="flex-direction:column;align-items:flex-start;gap:4px;"><span class="fl" style="width:auto;font-size:11px;color:var(--text3);">BACK</span><input type="number" id="ptd-b" value="3.5" min="0" max="24" step="0.5" inputmode="decimal" style="width:100%;" oninput="S.ptdB=+this.value||0;calcAndRender()"/></div>
-        <div class="fr" style="flex-direction:column;align-items:flex-start;gap:4px;"><span class="fl" style="width:auto;font-size:11px;color:var(--text3);">LEFT</span><input type="number" id="ptd-l" value="3.5" min="0" max="24" step="0.5" inputmode="decimal" style="width:100%;" oninput="S.ptdL=+this.value||0;calcAndRender()"/></div>
-        <div class="fr" style="flex-direction:column;align-items:flex-start;gap:4px;"><span class="fl" style="width:auto;font-size:11px;color:var(--text3);">RIGHT</span><input type="number" id="ptd-r" value="3.5" min="0" max="24" step="0.5" inputmode="decimal" style="width:100%;" oninput="S.ptdR=+this.value||0;calcAndRender()"/></div>
-      </div>
-    </div>
-    <div class="dd" id="pan-dd"></div>
-    <div id="pan-os" class="banner bwarn" style="display:none;"><span class="bi">⚠</span><span id="pan-os-txt"></span></div>
-    <div id="pan-ok" class="banner bok" style="display:none;"><span class="bi">✓</span><span id="pan-ok-txt"></span></div>
-
-```
-<div class="sec-lbl" style="margin-top:16px;">Pan add-ons</div>
-<div class="addon-grid" id="pan-addons"></div>
-<div id="storm-mat-row" style="display:none;margin-top:10px;">
-  <div class="fr">
-    <span class="fl">Collar material</span>
-    <select id="storm-mat" onchange="S.stormMat=this.value;calcAndRender()">
-      <option value="galv">Galvanized — $65</option>
-      <option value="ss">Stainless steel — $125</option>
-    </select>
-  </div>
+<div class="tabs">
+  <div class="tab active" data-page="scanner" onclick="showTab(this)">Scanner</div>
+  <div class="tab" data-page="registry" onclick="showTab(this)">Asset Registry</div>
 </div>
-```
 
-  </div>
-
-  <!-- SHROUD -->
-
-  <div class="section shr-s">
-    <div class="sec-hd">
-      <span class="sec-badge bt">Shroud</span>
-      <span style="font-size:12px;color:var(--text3);">Optional add-on</span>
+<!-- SCANNER PAGE -->
+<div id="page-scanner" class="page active">
+<div class="layout">
+  <div>
+    <div class="panel" style="margin-bottom:1.5rem;">
+      <div class="panel-head">Camera</div>
+      <div class="panel-body">
+        <select id="camera-select"><option>Loading cameras…</option></select>
+        <video id="preview" autoplay muted playsinline style="margin-top:0.75rem;"></video>
+        <div class="scan-result" id="last-scan"><span>Waiting for scan…</span></div>
+      </div>
     </div>
-    <div class="sec-lbl" style="margin-top:0;">Standard shrouds</div>
-    <div class="pg pg4" id="sh-grid"></div>
-    <div class="sec-lbl">Arch styles</div>
-    <div class="pg" id="arch-grid"></div>
-    <div class="sec-lbl">Doghouse styles</div>
-    <div class="pg" id="dog-grid"></div>
-    <div class="sec-lbl">Bird cage styles</div>
-    <div class="pg pg4" id="bird-grid"></div>
-    <div class="sec-lbl">Custom</div>
-    <div class="pg" id="custom-grid"></div>
-    <div id="custom-note" class="banner bwarn" style="display:none;margin-top:8px;">
-      <span class="bi">⚠</span>
-      <span>Custom shroud requires a customer-supplied drawing or CAD file. Must be reviewed and approved by Crown and Cover Fabrication before production. Price TBD — quote issued after approval. Upload drawing in the Files tab.</span>
-    </div>
-    <div id="sh-dims" style="display:none;margin-top:14px;">
-      <div class="sec-lbl">Shroud dimensions</div>
-      <div class="dims-wrap">
-        <div class="dims-col">
-          <div class="dims-col-title">Opening size</div>
-          <div class="fr"><span class="fl">Width (in)</span><input type="number" id="sw" value="30" min="1" max="240" step="0.125" inputmode="decimal" oninput="S.sw=+this.value||0;calcAndRender()"/></div>
-          <div class="fr"><span class="fl">Length (in)</span><input type="number" id="sl" value="30" min="1" max="240" step="0.125" inputmode="decimal" oninput="S.sl=+this.value||0;calcAndRender()"/></div>
+    <div class="panel">
+      <div class="panel-head">Log entry</div>
+      <div class="panel-body">
+        <div class="field-row">
+          <label>Asset tag (auto-filled on scan)</label>
+          <input type="text" id="f-tag" placeholder="BB-001" oninput="onTagInput(this.value)" />
         </div>
-        <div class="dims-divider"></div>
-        <div class="dims-col">
-          <div class="dims-col-title">Turndown <span style="font-weight:400;color:var(--text3);">— first 2" free</span></div>
-          <div class="fr"><span class="fl">Depth (in)</span><input type="number" id="std" value="3.5" min="0" max="24" step="0.5" inputmode="decimal" oninput="S.std=+this.value||0;calcAndRender()"/></div>
+        <div class="tool-match-card" id="tool-match-card">
+          <div class="tm-name" id="tm-name"></div>
+          <div class="tm-meta" id="tm-meta"></div>
+        </div>
+        <div class="field-row">
+          <label>Tool name</label>
+          <input type="text" id="f-toolname" placeholder="Auto-filled from registry or enter manually" />
+        </div>
+        <div class="field-row">
+          <label>Tool type / category</label>
+          <input type="text" id="f-tooltype" placeholder="Auto-filled from registry or enter manually" />
+        </div>
+        <div class="field-row">
+          <label>Serial number</label>
+          <input type="text" id="f-serial" placeholder="Auto-filled from registry or enter manually" />
+        </div>
+        <div class="field-row">
+          <label>Tech / assigned to</label>
+          <input type="text" id="f-tech" placeholder="e.g. Mike S." />
+        </div>
+        <div class="field-row">
+          <label>Action</label>
+          <select id="f-action">
+            <option value="Check-Out">Check-Out</option>
+            <option value="Check-In">Check-In</option>
+            <option value="Spot Check">Spot Check</option>
+          </select>
+        </div>
+        <div class="field-row">
+          <label>Notes (optional)</label>
+          <input type="text" id="f-notes" placeholder="Job #, condition, etc." />
+        </div>
+        <div class="controls">
+          <button class="primary" onclick="addEntry()">+ Add to log</button>
+          <button onclick="clearForm()">Clear</button>
         </div>
       </div>
-      <div class="dd" id="sh-dd"></div>
-      <div id="sh-os" class="banner bwarn" style="display:none;"><span class="bi">⚠</span><span id="sh-os-txt"></span></div>
-      <div id="sh-ok" class="banner bok" style="display:none;"><span class="bi">✓</span><span id="sh-ok-txt"></span></div>
     </div>
   </div>
 
-</div><!-- /tab-fab -->
-
-<!-- ── GAS LOGS ── -->
-
-<div class="tool-panel" id="tab-gaslogs">
-  <div class="cs"><span class="cs-icon">🔥</span><div class="cs-title">Gas Log Selector</div><div class="cs-sub">Configure and price gas log sets based on firebox dimensions, BTU requirements, and venting type.</div><span class="cs-badge">In Development</span></div>
-</div>
-
-<!-- ── LABOR ── -->
-
-<div class="tool-panel" id="tab-labor">
-  <div class="cs"><span class="cs-icon">⏱</span><div class="cs-title">Labor Calculator</div><div class="cs-sub">Estimate installation labor by job type, crew size, and site conditions.</div><span class="cs-badge">In Development</span></div>
-</div>
-
-<!-- ── FILES ── -->
-
-<div class="tool-panel" id="tab-files">
-  <div class="section">
-    <div class="sec-hd"><div class="sec-title">Job Files</div></div>
-    <div class="sec-lbl" style="margin-top:0;">Upload drawings, photos, or documents</div>
-    <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-in').click()" ondragover="ev.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="dropFiles(event)">
-      <span class="uz-icon">📁</span>
-      <div class="uz-title">Tap to add files</div>
-      <div class="uz-sub">PDF, JPG, PNG, DWG, DXF</div>
+  <div class="panel" style="display:flex;flex-direction:column;">
+    <div class="panel-head">
+      Scan log
+      <input type="date" id="f-date" style="margin-left:auto;font-size:12px;padding:3px 7px;border:1px solid #d0c9c0;border-radius:5px;" />
     </div>
-    <input type="file" id="file-in" multiple style="display:none" onchange="addFiles(event)" accept=".pdf,.dwg,.dxf,.jpg,.jpeg,.png"/>
-    <div id="file-list"></div>
-    <div class="sec-lbl" style="margin-top:16px;">Job notes</div>
-    <textarea class="note-area" id="job-notes" placeholder="Special instructions, timeline, custom notes..."></textarea>
-  </div>
-  <div class="section">
-    <div class="sec-hd"><div class="sec-title">Custom Shroud Drawing</div></div>
-    <div class="banner binfo" style="margin-top:0;"><span class="bi">ℹ</span><span>Custom shroud drawing must be uploaded and approved by Crown and Cover Fabrication before production. Accepted: PDF, DWG, DXF, or dimensioned image.</span></div>
-    <div class="upload-zone" style="margin-top:12px;" onclick="document.getElementById('draw-in').click()">
-      <span class="uz-icon">📐</span>
-      <div class="uz-title">Upload Drawing</div>
-      <div class="uz-sub">PDF, DWG, DXF, or image</div>
+    <div style="flex:1;overflow-x:auto;min-height:300px;">
+      <table class="log-table">
+        <thead><tr><th>Time</th><th>Tag</th><th>Tool</th><th>Type</th><th>Serial #</th><th>Tech</th><th>Action</th><th>Notes</th><th></th></tr></thead>
+        <tbody id="log-body"><tr><td colspan="9" class="empty">No entries yet. Scan a barcode or add manually.</td></tr></tbody>
+      </table>
     </div>
-    <input type="file" id="draw-in" style="display:none" onchange="addDrawings(event)" accept=".pdf,.dwg,.dxf,.jpg,.jpeg,.png"/>
-    <div id="draw-list"></div>
+    <div class="toolbar">
+      <span class="count" id="entry-count">0 entries</span>
+      <button onclick="clearLog()" class="danger">Clear log</button>
+      <button class="primary" onclick="exportPDF()">Export PDF</button>
+    </div>
   </div>
 </div>
-
-<!-- ── FIREPLACE ── -->
-
-<div class="tool-panel" id="tab-fireplace">
-  <div class="cs"><span class="cs-icon">🏠</span><div class="cs-title">Fireplace Selector</div><div class="cs-sub">Select fireplace models based on BTU, firebox dimensions, fuel type, and installation type.</div><span class="cs-badge">In Development</span></div>
 </div>
 
-<!-- ── FINAL QUOTE ── -->
-
-<div class="tool-panel" id="tab-quote">
-  <!-- print-only header -->
-  <div class="print-header" style="display:none;">
-    <div class="print-logo"><svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="18" y="44" width="28" height="16" rx="2" fill="white" opacity="0.9"/><rect x="14" y="40" width="36" height="7" rx="1.5" fill="white" opacity="0.95"/><rect x="23" y="47" width="5" height="7" rx="1" fill="#e8521a"/><rect x="36" y="47" width="5" height="7" rx="1" fill="#e8521a"/><ellipse cx="32" cy="33" rx="11" ry="9" fill="white" opacity="0.95"/><circle cx="32" cy="22" r="9" fill="white" opacity="0.95"/><ellipse cx="32" cy="22" rx="12" ry="11" fill="white" opacity="0.5"/><circle cx="29" cy="20" r="1.5" fill="#e8521a"/><circle cx="35" cy="20" r="1.5" fill="#e8521a"/><path d="M29 24 Q32 26.5 35 24" stroke="#e8521a" stroke-width="1.2" fill="none" stroke-linecap="round"/><ellipse cx="32" cy="23" rx="1.5" ry="1" fill="#e8521a" opacity="0.8"/><path d="M23 15 L26 20 L20 19 Z" fill="white" opacity="0.9"/><path d="M41 15 L38 20 L44 19 Z" fill="white" opacity="0.9"/><path d="M43 36 Q50 32 48 26 Q47 23 44 25" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.85"/><ellipse cx="25" cy="40" rx="4" ry="2.5" fill="white" opacity="0.9"/><ellipse cx="39" cy="40" rx="4" ry="2.5" fill="white" opacity="0.9"/></svg></div>
-    <div class="print-company">
-      <div class="print-company-name">Crown &amp; Cover Fabrication</div>
-      <div class="print-company-sub">Estimate / Quote</div>
-    </div>
-  </div>
-  <div class="section" style="margin-bottom:14px;">
-    <div class="sec-hd"><div class="sec-title">Customer &amp; Job Info</div></div>
-    <div class="cust-grid">
-      <div class="cfield"><label>Customer name</label><input type="text" id="cust-name" placeholder="John Smith"/></div>
-      <div class="cfield"><label>Company</label><input type="text" id="cust-co" placeholder="Smith Chimney Co."/></div>
-      <div class="cfield"><label>Phone</label><input type="tel" id="cust-ph" placeholder="(843) 555-0100"/></div>
-      <div class="cfield"><label>Email</label><input type="email" id="cust-em" placeholder="john@company.com"/></div>
-      <div class="cfield"><label>Estimate #</label><input type="text" id="est-num" placeholder="EST-2024-001"/></div>
-      <div class="cfield"><label>Date</label><input type="text" id="est-date"/></div>
-      <div class="cfield full"><label>Job address / notes</label><textarea id="job-addr" placeholder="123 Main St, Charleston SC 29401"></textarea></div>
-    </div>
-  </div>
-  <div id="q-breakdown"></div>
-  <div class="totals-block">
-    <div class="tt">Quote summary</div>
-    <div id="q-totals"></div>
-    <div class="grand">
-      <div>
-        <div class="g-label">Total estimate</div>
-        <div class="g-note" id="g-note"></div>
+<!-- REGISTRY PAGE -->
+<div id="page-registry" class="page">
+<div class="registry-page">
+  <div class="registry-grid">
+    <div class="panel">
+      <div class="panel-head">Add / edit asset</div>
+      <div class="panel-body">
+        <div class="field-row">
+          <label>Asset tag (BB-###)</label>
+          <input type="text" id="r-tag" placeholder="BB-001" />
+        </div>
+        <div class="field-row">
+          <label>Tool name</label>
+          <input type="text" id="r-name" placeholder="e.g. Combustion Analyzer" />
+        </div>
+        <div class="field-row">
+          <label>Tool type / category</label>
+          <select id="r-type">
+            <option value="">— select —</option>
+            <option>Test Equipment</option>
+            <option>Power Tool</option>
+            <option>Hand Tool</option>
+            <option>Measuring</option>
+            <option>Safety</option>
+            <option>Ladder / Access</option>
+            <option>Venting / Install</option>
+            <option>Camera / Inspection</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="field-row">
+          <label>Brand / model</label>
+          <input type="text" id="r-model" placeholder="e.g. Bacharach Insight Plus" />
+        </div>
+        <div class="field-row">
+          <label>Serial number</label>
+          <input type="text" id="r-serial" placeholder="Manufacturer S/N" />
+        </div>
+        <div class="field-row">
+          <label>Purchase price ($)</label>
+          <input type="number" id="r-price" placeholder="0.00" step="0.01" min="0" />
+        </div>
+        <div class="field-row">
+          <label>Notes</label>
+          <input type="text" id="r-notes" placeholder="Condition, truck assignment, etc." />
+        </div>
+        <div class="controls">
+          <button class="primary" onclick="saveAsset()">Save asset</button>
+          <button onclick="clearRegistryForm()">Clear</button>
+        </div>
+        <div id="r-msg"></div>
       </div>
-      <div class="g-val" id="g-val">$0.00</div>
     </div>
-    <div style="margin-top:14px;">
-      <button class="btn btn-p no-print" onclick="window.print()">Print / Save as PDF</button>
-      <button class="btn btn-o no-print" onclick="resetAll()">Clear &amp; Start Over</button>
+
+    <div class="panel" style="display:flex;flex-direction:column;">
+      <div class="panel-head">
+        Registered assets
+        <span style="margin-left:auto;font-size:11px;color:#aaa;" id="asset-count">0 assets</span>
+      </div>
+      <div style="flex:1;overflow-x:auto;">
+        <table class="asset-table">
+          <thead><tr><th>Tag</th><th>Tool name</th><th>Type</th><th>Brand / model</th><th>Serial #</th><th>Value</th><th></th></tr></thead>
+          <tbody id="asset-body"><tr><td colspan="7" class="empty">No assets registered yet.</td></tr></tbody>
+        </table>
+      </div>
+      <div class="toolbar">
+        <span class="count" id="asset-total-val"></span>
+        <button class="primary" onclick="exportRegistryPDF()">Export registry PDF</button>
+      </div>
     </div>
-    <div class="legal">Lead time: 2 weeks unless noted on PO. Copper quotes valid 1 week.<br>Crown and Cover Fabrication is not liable for damages from mishandling or faulty installation.</div>
   </div>
 </div>
-
-</div><!-- /content -->
-</div><!-- /scroll-area -->
-
-<!-- ══ BOTTOM TAB BAR ══ -->
-
-<nav class="bottomnav">
-  <button class="btab active" data-tab="fab" onclick="goTab('fab',this)">
-    <span class="btab-icon">⬡</span>
-    <span class="btab-label">Fab</span>
-  </button>
-  <button class="btab disabled" data-tab="gaslogs" onclick="goTab('gaslogs',this)">
-    <span class="btab-icon">🔥</span>
-    <span class="btab-label">Gas Logs</span>
-    <span class="btab-soon">Soon</span>
-  </button>
-  <button class="btab disabled" data-tab="labor" onclick="goTab('labor',this)">
-    <span class="btab-icon">⏱</span>
-    <span class="btab-label">Labor</span>
-    <span class="btab-soon">Soon</span>
-  </button>
-  <button class="btab" data-tab="files" onclick="goTab('files',this)">
-    <span class="btab-icon">📎</span>
-    <span class="btab-label">Files</span>
-  </button>
-  <button class="btab disabled" data-tab="fireplace" onclick="goTab('fireplace',this)">
-    <span class="btab-icon">🏠</span>
-    <span class="btab-label">Fireplace</span>
-    <span class="btab-soon">Soon</span>
-  </button>
-  <button class="btab" data-tab="quote" onclick="goTab('quote',this)">
-    <span class="btab-icon">$</span>
-    <span class="btab-label">Quote</span>
-  </button>
-</nav>
-
-</div><!-- /app -->
+</div>
 
 <script>
-/* ══ DATA ══ */
-const RATES={
-  galvalume:{pan:6,panOs:7,sh:9,shOs:10,shSeam:9,arch:9,dog:11,bird:14,seamAdd:100,archAdd:400,archSeamAdd:550,dogAdd:700,birdAdd:800},
-  aluminum: {pan:6,panOs:7,sh:9,shOs:10,shSeam:9,arch:9,dog:11,bird:14,seamAdd:100,archAdd:400,archSeamAdd:550,dogAdd:700,birdAdd:800},
-  stainless:{pan:10,panOs:11,sh:13,shOs:16,shSeam:13,arch:13,dog:15,bird:18,seamAdd:150,archAdd:600,archSeamAdd:750,dogAdd:900,birdAdd:1000},
-  copper:   {pan:14,panOs:15,sh:17,shOs:20,shSeam:17,arch:17,dog:19,bird:22,seamAdd:200,archAdd:900,archSeamAdd:1050,dogAdd:1200,birdAdd:1300},
-};
-const ALC=[
-  {n:'Bone white',h:'#EDE8DC'},{n:'Regal white',h:'#F4F3EE'},{n:'Sandstone',h:'#C8B99A'},
-  {n:'Bright silver',h:'#C0BFC0'},{n:'Colonial red',h:'#7A2629'},{n:'Aged copper',h:'#7A9E8E'},
-  {n:'Burgundy',h:'#5A1A2A'},{n:'Pre-wthr Galv',h:'#9A9E9B'},{n:'Pacific blue',h:'#2E5F8A'},
-  {n:'Slate blue',h:'#5B6E8A'},{n:'Teal blue',h:'#1A7A7A'},{n:'Champagne',h:'#C8B060'},
-  {n:'Patina green',h:'#6A9A72'},{n:'Forest green',h:'#2A4A2A'},{n:'Island blue',h:'#3A7A8A'},
-  {n:'Metallic copper',h:'#A05A28'},{n:'Hartford green',h:'#1A3A1A'},{n:'Charcoal gray',h:'#4A4A4A'},
-  {n:'Dove gray',h:'#9A9A9A'},{n:'Dark bronze',h:'#3A2A1A'},{n:'Sierra tan',h:'#A8896A'},
-  {n:'Medium bronze',h:'#6A4A28'},{n:'Matte black',h:'#1A1A1A'},{n:'Terra cotta',h:'#B0502A'},
-  {n:'Deep blue sea',h:'#1A2A5A'},{n:'Mansard brown',h:'#4A2A1A'},{n:'Hemlock',h:'#4A6A5A'},
-  {n:'Slate gray',h:'#6A6A6A'},{n:'Buckskin',h:'#B09060'},{n:'Other / custom',h:null},
-];
-const SHROUDS=[
-  {id:'sh_std',num:'1–4,10,11',name:'Standard shroud',note:'',type:'shroud'},
-  {id:'sh_seam',num:'w/ seams',name:'Shroud + standing seams',note:'',type:'shroud_seam'},
-  {id:'sh_p7',num:'#7',name:'Princess',note:'+$100',type:'shroud_p7'},
-  {id:'sh_p8',num:'#8',name:'Prince',note:'+$200',type:'shroud_p8'},
-];
-const ARCHS=[
-  {id:'arch',num:'#32',name:"Bishop's Arch",note:'',type:'arch'},
-  {id:'arch_dbl',num:'#32B',name:'Dbl Diamonds',note:'2× arch',type:'arch_dbl'},
-  {id:'arch_seam',num:'#33',name:'Cardinal (arch+seams)',note:'',type:'arch_seam'},
-];
-const DOGS=[
-  {id:'dog',num:'#40',name:'Sentry (doghouse)',note:'',type:'dog'},
-  {id:'dog_fac',num:'#40B',name:'Doghouse + facade',note:'+$100–200',type:'dog_fac'},
-  {id:'dog_seam',num:'#41',name:'Outpost (dog+seams)',note:'',type:'dog_seam'},
-];
-const BIRDS=[
-  {id:'bird',num:'#58B',name:'Rockhouse',note:'Standard',type:'bird'},
-  {id:'bird_54',num:'#54',name:'Hacienda',note:'TBD',type:'bird_c'},
-  {id:'bird_54b',num:'#54B',name:'Cantina',note:'TBD',type:'bird_c'},
-  {id:'bird_58',num:'#58',name:'Mesa w/ screen',note:'',type:'bird_c'},
-];
-const CUSTOMS=[{id:'custom',num:'#XX',name:'Custom shroud',note:'Drawing required',type:'custom'}];
-const ADDONS=[
-  {id:'flue',label:'Extra flue hole',price:50},
-  {id:'drip',label:'Drip edge',price:100},
-  {id:'pot',label:'Pot tabs',price:100},
-  {id:'tst',label:'TST tabs',price:100},
-  {id:'storm',label:'Storm collar',price:0,sp:true},
-];
+const log = [];
+const assets = {};
+let codeReader = null;
+let lastScannedTag = null;
 
-/* ══ STATE ══ */
-let S={
-  mat:'galvalume',alIdx:null,alOther:false,
-  product:null,
-  pw:30,pl:30,ptd:3.5,sameSides:true,ptdF:3.5,ptdB:3.5,ptdL:3.5,ptdR:3.5,
-  sw:30,sl:30,std:3.5,
-  addons:{},stormMat:'galv',
-};
-let uFiles=[],uDrawings=[];
-let uFileData=[],uDrawingData=[]; // {name,size,dataUrl,isImage}
+function pad(n){ return String(n).padStart(2,'0'); }
+function nowTime(){ const d=new Date(); return pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds()); }
+function todayDate(){ const d=new Date(); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmt$(v){ return (v&&parseFloat(v))?'$'+parseFloat(v).toFixed(2):'—'; }
 
-/* ══ MATH ══ */
-const CI=Math.ceil;
-function maxTD(){return S.sameSides?S.ptd:Math.max(S.ptdF,S.ptdB,S.ptdL,S.ptdR);}
-function billPan(){
-  if(S.sameSides){return CI(S.pw+S.pl)+4*Math.max(0,CI(S.ptd)-2);}
-  return CI(S.pw+S.pl)+Math.max(0,CI(S.ptdF)-2)+Math.max(0,CI(S.ptdB)-2)+Math.max(0,CI(S.ptdL)-2)+Math.max(0,CI(S.ptdR)-2);
-}
-function billSh(){return CI(S.sw+S.sl)+4*Math.max(0,CI(S.std)-2);}
-function panOs(){
-  const td=maxTD(),da=S.addons.drip?2:0;
-  const ew=S.pw+2*td+da,el=S.pl+2*td+da;
-  return {os:ew>48||el>120,ew,el};
-}
-function shOs(){return (S.sw+S.sl)>120;}
-function panRate(){
-  const {os}=panOs(),r=RATES[S.mat];
-  if(!os)return r.pan;
-  return S.mat==='galvalume'||S.mat==='aluminum'?7:S.mat==='stainless'?11:15;
+document.getElementById('f-date').value = todayDate();
+setInterval(()=>{ document.getElementById('clock').textContent = nowTime(); }, 1000);
+
+function showTab(el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('page-'+el.dataset.page).classList.add('active');
 }
 
-/* ══ CALC ══ */
-function calcPan(){
-  const pr=panRate(),bill=billPan(),{os,ew,el}=panOs();
-  const lines=[];let total=0;
-  const lc=+(bill*pr).toFixed(2);total+=lc;
-  lines.push({l:`Chase pan${os?' (oversized — two-piece)':''}`,v:'$'+lc.toFixed(2)});
-  if(S.addons.drip){total+=50;lines.push({l:'Drip edge',v:'$50.00'});}
-  if(S.addons.flue){total+=25;lines.push({l:'Extra flue hole',v:'$25.00'});}
-  if(S.addons.pot){total+=50;lines.push({l:'Pot tabs',v:'$50.00'});}
-  if(S.addons.tst){total+=50;lines.push({l:'TST tabs',v:'$50.00'});}
-  if(S.addons.storm){const sp=S.stormMat==='ss'?250:130;total+=sp;lines.push({l:`Storm collar (${S.stormMat==='ss'?'stainless':'galvanized'})`,v:'$'+sp.toFixed(2)});}
-  return {lines,total,os,ew,el,bill,rate:pr};
-}
-function calcShroud(){
-  const all=[...SHROUDS,...ARCHS,...DOGS,...BIRDS,...CUSTOMS];
-  const prod=all.find(p=>p.id===S.product);
-  if(!prod)return null;
-  if(prod.type==='custom')return{lines:[{l:'Custom shroud — price TBD after drawing approval',v:'TBD',note:true}],total:0,tbd:true};
-  const r=RATES[S.mat],sOs=shOs(),bill=billSh(),bRate=sOs?r.shOs:r.sh;
-  const lines=[];let total=0;
-  switch(prod.type){
-    case 'shroud':{const lc=+(bill*bRate).toFixed(2);total+=lc;lines.push({l:`Shroud${sOs?' (oversized)':''}`,v:'$'+lc.toFixed(2)});break;}
-    case 'shroud_seam':{const lc=+(bill*r.shSeam).toFixed(2);total+=lc+r.seamAdd;lines.push({l:'Shroud with standing seams',v:'$'+lc.toFixed(2)},{l:'Standing seams',v:'$'+r.seamAdd.toFixed(2)});break;}
-    case 'shroud_p7':{const lc=+(bill*bRate).toFixed(2);total+=lc+100;lines.push({l:'Shroud — Princess style',v:'$'+lc.toFixed(2)},{l:'Princess upcharge',v:'$100.00'});break;}
-    case 'shroud_p8':{const lc=+(bill*bRate).toFixed(2);total+=lc+200;lines.push({l:'Shroud — Prince style',v:'$'+lc.toFixed(2)},{l:'Prince upcharge',v:'$200.00'});break;}
-    case 'arch':{const lc=+(bill*r.arch).toFixed(2);total+=lc+r.archAdd;lines.push({l:"Bishop's Arch",v:'$'+lc.toFixed(2)},{l:'Arch fabrication',v:'$'+r.archAdd.toFixed(2)});break;}
-    case 'arch_dbl':{const s=+(r.arch*bill).toFixed(2)+r.archAdd;total+=s*2;lines.push({l:"2× Bishop's Arch (double diamond)",v:'$'+(s*2).toFixed(2)});break;}
-    case 'arch_seam':{const lc=+(bill*r.arch).toFixed(2);total+=lc+r.archSeamAdd;lines.push({l:'Arch with standing seams',v:'$'+lc.toFixed(2)},{l:'Arch + seams',v:'$'+r.archSeamAdd.toFixed(2)});break;}
-    case 'dog':{const lc=+(bill*r.dog).toFixed(2);total+=lc+r.dogAdd;lines.push({l:'Doghouse',v:'$'+lc.toFixed(2)},{l:'Doghouse fabrication',v:'$'+r.dogAdd.toFixed(2)});break;}
-    case 'dog_fac':{const lc=+(bill*r.dog).toFixed(2);total+=lc+r.dogAdd+300;lines.push({l:'Doghouse with facade',v:'$'+lc.toFixed(2)},{l:'Doghouse fabrication',v:'$'+r.dogAdd.toFixed(2)},{l:'Facade upcharge',v:'$300.00'});break;}
-    case 'dog_seam':{const lc=+(bill*r.dog).toFixed(2);total+=lc+r.dogAdd+r.seamAdd;lines.push({l:'Doghouse with standing seams',v:'$'+lc.toFixed(2)},{l:'Doghouse + seams',v:'$'+(r.dogAdd+r.seamAdd).toFixed(2)});break;}
-    case 'bird':{const lc=+(bill*r.bird).toFixed(2);total+=lc+r.birdAdd;lines.push({l:'Bird cage',v:'$'+lc.toFixed(2)},{l:'Bird cage fabrication',v:'$'+r.birdAdd.toFixed(2)});break;}
-    case 'bird_c':{const lc=+(bill*r.bird).toFixed(2);total+=lc+r.birdAdd;lines.push({l:`Bird cage — ${prod.name}`,v:'$'+lc.toFixed(2)},{l:'Bird cage fabrication',v:'$'+r.birdAdd.toFixed(2)},{l:'Custom detail — contact for final confirmation',v:'',note:true});break;}
-  }
-  return{lines,total,tbd:false};
-}
-
-/* ══ RENDER ══ */
-function renderPanDD(){
-  const td=maxTD(),{os,ew,el}=panOs(),bill=billPan(),rate=panRate();
-  const tdStr=S.sameSides?`${S.ptd}" all sides`:`F${S.ptdF}" B${S.ptdB}" L${S.ptdL}" R${S.ptdR}"`;
-  document.getElementById('pan-dd').innerHTML=`Opening: <span>${S.pw}" × ${S.pl}"</span> · TD: <span>${tdStr}</span>${S.addons.drip?' + drip':''} · Billable: <span class="hi">${bill}"</span> <span class="no-print" style="opacity:.6">· Cost basis: $${rate}/in</span>`;
-  const osEl=document.getElementById('pan-os'),okEl=document.getElementById('pan-ok');
-  if(os){osEl.style.display='flex';okEl.style.display='none';document.getElementById('pan-os-txt').textContent=`Oversized pan — eff. ${ew.toFixed(2)}" × ${el.toFixed(2)}". Two-piece pan required.`;}
-  else{osEl.style.display='none';okEl.style.display='flex';document.getElementById('pan-ok-txt').textContent=`Standard size — eff. ${ew.toFixed(2)}" × ${el.toFixed(2)}". Single-piece pan.`;}
-}
-function renderShDD(){
-  const sOs=shOs(),bill=billSh(),r=RATES[S.mat],bRate=sOs?r.shOs:r.sh;
-  document.getElementById('sh-dd').innerHTML=`Opening: <span>${S.sw}" × ${S.sl}"</span> · TD: <span>${S.std}"</span> · L+W: <span>${(S.sw+S.sl).toFixed(2)}"</span> · Billable: <span class="hi">${bill}"</span> <span class="no-print" style="opacity:.6">· Cost basis: $${bRate}/in</span>`;
-  const osEl=document.getElementById('sh-os'),okEl=document.getElementById('sh-ok');
-  if(sOs){osEl.style.display='flex';okEl.style.display='none';document.getElementById('sh-os-txt').textContent=`Oversized shroud — combined L+W ${(S.sw+S.sl).toFixed(2)}" exceeds 120". Additional bracing required.`;}
-  else{osEl.style.display='none';okEl.style.display='flex';document.getElementById('sh-ok-txt').textContent='Standard shroud size.';}
-}
-function buildGrid(arr,id){
-  const el=document.getElementById(id);el.innerHTML='';
-  arr.forEach(p=>{
-    const b=document.createElement('button');
-    b.className='pb'+(S.product===p.id?' sel':'');
-    b.innerHTML=`<div class="pn">${p.num}</div><div class="pm">${p.name}</div>${p.note?`<div class="ps">${p.note}</div>`:''}`;
-    b.onclick=()=>{S.product=S.product===p.id?null:p.id;render();};
-    el.appendChild(b);
-  });
-}
-function buildAddons(){
-  const el=document.getElementById('pan-addons');el.innerHTML='';
-  ADDONS.forEach(a=>{
-    const d=document.createElement('label');
-    d.className='addon-btn'+(S.addons[a.id]?' sel':'');
-    d.innerHTML=`<input type="checkbox" ${S.addons[a.id]?'checked':''}/><span>${a.sp?'Storm collar':''+a.label+(a.price?` +$${a.price}`:'')}</span>`;
-    d.querySelector('input').onchange=e=>{S.addons[a.id]=e.target.checked;d.classList.toggle('sel',e.target.checked);document.getElementById('storm-mat-row').style.display=S.addons.storm?'block':'none';calcAndRender();};
-    el.appendChild(d);
-  });
-  document.getElementById('storm-mat-row').style.display=S.addons.storm?'block':'none';
-}
-function buildSwatches(){
-  const g=document.getElementById('sw-palette');if(!g)return;g.innerHTML='';
-  ALC.forEach((c,i)=>{
-    const w=document.createElement('div');w.className='sw-wrap';
-    if(c.h){
-      w.innerHTML=`<div class="sw${S.alIdx===i?' sel':''}" style="background:${c.h}" title="${c.n}"></div><div class="sw-lbl">${c.n}</div>`;
-      w.querySelector('.sw').onclick=()=>{S.alIdx=i;S.alOther=false;buildSwatches();renderColorChosen();calcAndRender();};
-    }else{
-      w.innerHTML=`<div class="sw${S.alOther?' sel':''}" style="background:var(--bg4);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--text3)">+</div><div class="sw-lbl">Other</div>`;
-      w.querySelector('.sw').onclick=()=>{S.alOther=true;S.alIdx=null;buildSwatches();renderColorChosen();calcAndRender();};
-    }
-    g.appendChild(w);
-  });
-}
-function renderColorChosen(){
-  const d=document.getElementById('color-chosen'),of=document.getElementById('other-fields');
-  if(S.alOther){of.style.display='block';d.style.display='none';}
-  else if(S.alIdx!==null){of.style.display='none';d.style.display='flex';const c=ALC[S.alIdx];d.innerHTML=`<div class="cdot" style="background:${c.h}"></div><span>Selected: <strong>${c.n}</strong></span>`;}
-  else{of.style.display='none';d.style.display='none';}
-}
-function updateQuote(){
-  const PR=calcPan(),SR=calcShroud();
-  const pt=PR.total,st=SR&&!SR.tbd?SR.total:0,gt=pt+st;
-  document.getElementById('hdr-total').textContent='$'+gt.toFixed(2);
-  const matLabel=S.mat==='aluminum'?(S.alOther?'Custom aluminum':(S.alIdx!==null?`Aluminum — ${ALC[S.alIdx].n}`:'Aluminum')):{galvalume:'Galvalume',stainless:'Stainless steel',copper:'Copper'}[S.mat];
-  let bd='';
-  bd+=`<div class="q-module"><div class="qm-hd"><span class="qm-title">Chase Pan / Cover</span><span class="qm-sub">$${pt.toFixed(2)}</span></div><div class="qm-body">`;
-  bd+=`<div class="ql"><span class="ll" style="font-size:11px;color:var(--text3);">${matLabel} · ${S.pw}" × ${S.pl}" · TD ${S.sameSides?S.ptd+'"':S.ptdF+'"F/'+S.ptdB+'"B'}</span><span class="lv" style="display:none"></span></div>`;
-  PR.lines.forEach(l=>{bd+=`<div class="ql"><span class="ll">${l.l}</span><span class="lv">${l.v}</span></div>`;});
-  bd+=`</div></div>`;
-  if(SR){
-    const shProd=[...SHROUDS,...ARCHS,...DOGS,...BIRDS,...CUSTOMS].find(p=>p.id===S.product);
-    bd+=`<div class="q-module"><div class="qm-hd"><span class="qm-title">Shroud${shProd?' — '+shProd.name:''}</span><span class="qm-sub">${SR.tbd?'TBD':'$'+SR.total.toFixed(2)}</span></div><div class="qm-body">`;
-    if(!SR.tbd)bd+=`<div class="ql"><span class="ll" style="font-size:11px;color:var(--text3);">${matLabel} · ${S.sw}" × ${S.sl}" · TD ${S.std}"</span><span class="lv" style="display:none"></span></div>`;
-    SR.lines.forEach(l=>{bd+=`<div class="ql${l.note?' note':''}"><span class="ll">${l.l}</span><span class="lv">${l.v||''}</span></div>`;});
-    bd+=`</div></div>`;
-  }else{
-    bd+=`<div class="q-module"><div class="qm-hd"><span class="qm-title">Shroud</span><span class="qm-sub" style="color:var(--text3)">Not selected</span></div><div class="q-empty">No shroud — select one in the Fab tab.</div></div>`;
-  }
-  const allData=[...uFileData,...uDrawingData];
-  const fc=allData.length;
-  if(fc>0){
-    const imgs=allData.filter(d=>d.isImage);
-    const docs=allData.filter(d=>!d.isImage);
-    bd+=`<div class="q-module photo-section"><div class="qm-hd"><span class="qm-title">Job Photos &amp; Files</span><span class="qm-sub" style="color:var(--text3)">${fc} item${fc>1?'s':''}</span></div><div class="qm-body">`;
-    if(imgs.length>0){
-      bd+=`<div class="photo-grid">`;
-      imgs.forEach((d,i)=>{
-        if(!d.dataUrl) return;
-        bd+=`<div class="photo-thumb"><img src="${d.dataUrl}" alt="${d.name.replace(/"/g,'&quot;')}" style="width:100%;height:100%;object-fit:cover;display:block;-webkit-print-color-adjust:exact;print-color-adjust:exact;" loading="eager"/><span class="photo-label">${d.name}</span></div>`;
-      });
-      bd+=`</div>`;
-    }
-    if(docs.length>0){
-      docs.forEach(d=>{
-        const ext=d.name.split('.').pop().toUpperCase();
-        const icons={PDF:'📄',DWG:'📐',DXF:'📐'};
-        bd+=`<div class="file-nonimage" style="margin-top:8px"><span style="font-size:16px">${icons[ext]||'📎'}</span><span class="fi-name">${d.name}</span><span style="color:var(--text3);font-size:11px">${fmtSize(d.size)}</span></div>`;
-      });
-    }
-    bd+=`</div></div>`;
-  }
-  document.getElementById('q-breakdown').innerHTML=bd;
-  let sb=`<div class="tr"><span class="trl">Chase pan / cover</span><span class="trv">$${pt.toFixed(2)}</span></div>`;
-  if(SR&&!SR.tbd)sb+=`<div class="tr"><span class="trl">Shroud</span><span class="trv">$${SR.total.toFixed(2)}</span></div>`;
-  else if(SR&&SR.tbd)sb+=`<div class="tr"><span class="trl">Shroud</span><span class="trv" style="color:var(--amber)">TBD</span></div>`;
-  else sb+=`<div class="tr"><span class="trl">Shroud</span><span class="trv" style="color:var(--text3)">—</span></div>`;
-  document.getElementById('q-totals').innerHTML=sb;
-  document.getElementById('g-val').textContent='$'+gt.toFixed(2)+(SR&&SR.tbd?' + TBD':'');
-  document.getElementById('g-note').textContent=S.mat==='copper'?'Copper prices approximate':'';
-}
-function calcAndRender(){renderPanDD();if(S.product&&S.product!=='custom')renderShDD();updateQuote();}
-function render(){
-  document.querySelectorAll('.mat-btn').forEach(t=>t.classList.toggle('active',t.dataset.mat===S.mat));
-  document.getElementById('al-panel').style.display=S.mat==='aluminum'?'block':'none';
-  document.getElementById('copper-warn').style.display=S.mat==='copper'?'flex':'none';
-  document.getElementById('copper-dis').style.display=S.mat==='copper'?'flex':'none';
-  buildGrid(SHROUDS,'sh-grid');buildGrid(ARCHS,'arch-grid');buildGrid(DOGS,'dog-grid');buildGrid(BIRDS,'bird-grid');buildGrid(CUSTOMS,'custom-grid');
-  document.getElementById('custom-note').style.display=S.product==='custom'?'flex':'none';
-  document.getElementById('sh-dims').style.display=(S.product&&S.product!=='custom')?'block':'none';
-  calcAndRender();
-}
-
-/* ══ UI ══ */
-function goTab(id,el){
-  document.querySelectorAll('.tool-panel').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.btab').forEach(t=>t.classList.remove('active'));
-  document.getElementById('tab-'+id).classList.add('active');
-  const btn=el||document.querySelector('[data-tab='+id+']');
-  if(btn)btn.classList.add('active');
-  document.getElementById('scroll-area').scrollTo(0,0);
-  if(id==='quote')updateQuote();
-}
-function setMat(mat){
-  S.mat=mat;
-  document.querySelectorAll('.mat-btn').forEach(t=>t.classList.toggle('active',t.dataset.mat===mat));
-  document.getElementById('al-panel').style.display=mat==='aluminum'?'block':'none';
-  document.getElementById('copper-warn').style.display=mat==='copper'?'flex':'none';
-  document.getElementById('copper-dis').style.display=mat==='copper'?'flex':'none';
-  if(mat==='aluminum')buildSwatches();
-  calcAndRender();
-}
-
-/* ══ FILES ══ */
-function fmtSize(b){return b<1048576?(b/1024).toFixed(0)+' KB':(b/1048576).toFixed(1)+' MB';}
-function renderFiles(arr,id,key){
-  const el=document.getElementById(id);el.innerHTML='';
-  const icons={PDF:'📄',DWG:'📐',DXF:'📐',JPG:'🖼',JPEG:'🖼',PNG:'🖼',HEIC:'🖼'};
-  arr.forEach((f,i)=>{
-    const ext=f.name.split('.').pop().toUpperCase();
-    const d=document.createElement('div');d.className='file-item';
-    d.innerHTML=`<span class="fi-icon">${icons[ext]||'📎'}</span><span class="fi-name">${f.name}</span><span class="fi-size">${fmtSize(f.size)}</span><button class="fi-del" onclick="rmFile(${i},'${key}')">✕</button>`;
-    el.appendChild(d);
-  });
-}
-const IMG_EXTS=['jpg','jpeg','png','gif','webp','bmp'];
-const IMG_TYPES=['image/jpeg','image/jpg','image/png','image/heic','image/heif','image/webp','image/gif','image/bmp'];
-function readFileData(file){
-  return new Promise(res=>{
-    // Check by mime type first, then fall back to extension (important for iPhone HEIC)
-    const ext=(file.name.split('.').pop()||'').toLowerCase();
-    // HEIC not supported natively in browsers — treat as document not image
-    const isImg=(IMG_TYPES.includes(file.type.toLowerCase())||IMG_EXTS.includes(ext))&&ext!=='heic';
-    if(!isImg){res({name:file.name,size:file.size,dataUrl:null,isImage:false});return;}
-    const r=new FileReader();
-    r.onload=e=>res({name:file.name,size:file.size,dataUrl:e.target.result,isImage:true});
-    r.onerror=()=>res({name:file.name,size:file.size,dataUrl:null,isImage:false});
-    r.readAsDataURL(file);
-  });
-}
-async function addFiles(e){
-  const newData=await Promise.all(Array.from(e.target.files).map(readFileData));
-  uFileData=[...uFileData,...newData];
-  uFiles=uFileData.map(d=>({name:d.name,size:d.size}));
-  renderFilesNew(uFileData,'file-list','f');
-  updateQuote();
-}
-async function addDrawings(e){
-  const newData=await Promise.all(Array.from(e.target.files).map(readFileData));
-  uDrawingData=[...uDrawingData,...newData];
-  uDrawings=uDrawingData.map(d=>({name:d.name,size:d.size}));
-  renderFilesNew(uDrawingData,'draw-list','d');
-  updateQuote();
-}
-function rmFile(i,key){
-  if(key==='f'){uFileData.splice(i,1);uFiles=uFileData.map(d=>({name:d.name,size:d.size}));renderFilesNew(uFileData,'file-list','f');}
-  else{uDrawingData.splice(i,1);uDrawings=uDrawingData.map(d=>({name:d.name,size:d.size}));renderFilesNew(uDrawingData,'draw-list','d');}
-  updateQuote();
-}
-async function dropFiles(e){
-  e.preventDefault();document.getElementById('upload-zone').classList.remove('dragover');
-  const newData=await Promise.all(Array.from(e.dataTransfer.files).map(readFileData));
-  uFileData=[...uFileData,...newData];
-  uFiles=uFileData.map(d=>({name:d.name,size:d.size}));
-  renderFilesNew(uFileData,'file-list','f');
-  updateQuote();
-}
-function renderFilesNew(arr,containerId,key){
-  const el=document.getElementById(containerId);el.innerHTML='';
-  const imgs=arr.filter(d=>d.isImage);
-  const docs=arr.filter(d=>!d.isImage);
-  if(imgs.length>0){
-    const grid=document.createElement('div');grid.className='photo-grid';grid.style.marginTop='10px';
-    imgs.forEach((d,rawIdx)=>{
-      const idx=arr.indexOf(d);
-      const wrap=document.createElement('div');wrap.className='photo-thumb';
-      wrap.innerHTML=`<img src="${d.dataUrl}" alt="${d.name}" loading="lazy"/>
-        <span class="photo-label">${d.name}</span>
-        <button class="photo-del" onclick="rmFile(${idx},'${key}')" title="Remove">✕</button>`;
-      grid.appendChild(wrap);
+async function initCamera(){
+  if(typeof ZXing==='undefined'){ setTimeout(initCamera,300); return; }
+  codeReader = new ZXing.BrowserMultiFormatReader();
+  try {
+    const devices = await codeReader.listVideoInputDevices();
+    const sel = document.getElementById('camera-select');
+    sel.innerHTML = '';
+    devices.forEach((d,i)=>{
+      const o=document.createElement('option');
+      o.value=d.deviceId; o.text=d.label||'Camera '+(i+1); sel.appendChild(o);
     });
-    el.appendChild(grid);
+    if(devices.length){
+      const id=devices[devices.length>1?1:0].deviceId;
+      sel.value=id; startScan(id);
+    }
+    sel.onchange=()=>{ codeReader.reset(); startScan(sel.value); };
+  } catch(e){
+    document.getElementById('camera-select').innerHTML='<option>Camera unavailable</option>';
   }
-  docs.forEach((d,rawIdx)=>{
-    const idx=arr.indexOf(d);
-    const ext=d.name.split('.').pop().toUpperCase();
-    const icons={PDF:'📄',DWG:'📐',DXF:'📐'};
-    const div=document.createElement('div');div.className='file-nonimage';
-    div.innerHTML=`<span style="font-size:18px">${icons[ext]||'📎'}</span><span class="fi-name">${d.name}</span><span style="color:var(--text3);font-size:11px;flex-shrink:0">${fmtSize(d.size)}</span><button class="fi-del" onclick="rmFile(${idx},'${key}')">✕</button>`;
-    el.appendChild(div);
+}
+
+function startScan(deviceId){
+  codeReader.decodeFromVideoDevice(deviceId, document.getElementById('preview'), (result)=>{
+    if(!result) return;
+    const val = result.getText();
+    if(val===lastScannedTag) return;
+    lastScannedTag=val;
+    setTimeout(()=>{ lastScannedTag=null; }, 2500);
+    document.getElementById('f-tag').value = val;
+    populateFromRegistry(val, true);
   });
 }
 
-/* ══ RESET ══ */
-function resetAll(){
-  if(!confirm('Clear all quote data and start over?'))return;
-  S={mat:'galvalume',alIdx:null,alOther:false,product:null,pw:30,pl:30,ptd:3.5,sameSides:true,ptdF:3.5,ptdB:3.5,ptdL:3.5,ptdR:3.5,sw:30,sl:30,std:3.5,addons:{},stormMat:'galv'};
-  uFiles=[];uDrawings=[];uFileData=[];uDrawingData=[];
-  const def={pw:30,pl:30,ptd:3.5,sw:30,sl:30,std:3.5,'ptd-f':3.5,'ptd-b':3.5,'ptd-l':3.5,'ptd-r':3.5};
-  Object.entries(def).forEach(([k,v])=>{const el=document.getElementById(k);if(el)el.value=v;});
-  document.getElementById('same-sides').checked=true;
-  document.getElementById('asym-tds').style.display='none';
-  buildAddons();buildSwatches();render();
+function populateFromRegistry(tag, fromScan){
+  const key = tag.trim().toUpperCase();
+  const asset = assets[key];
+  const card = document.getElementById('tool-match-card');
+  const ls = document.getElementById('last-scan');
+
+  if(asset){
+    document.getElementById('f-toolname').value = asset.name||'';
+    document.getElementById('f-tooltype').value = asset.type||'';
+    document.getElementById('f-serial').value = asset.serial||'';
+    document.getElementById('tm-name').textContent = asset.name||key;
+    document.getElementById('tm-meta').textContent = [asset.type, asset.model, asset.serial?'S/N: '+asset.serial:''].filter(Boolean).join(' · ');
+    card.classList.add('visible');
+    if(fromScan){
+      ls.innerHTML = `<span style="color:#888;font-size:12px;">Scanned:</span> <span class="val">${escHtml(tag)}</span><span class="tool-detail">${escHtml(asset.name)}${asset.type?' · '+escHtml(asset.type):''}${asset.serial?' · S/N: '+escHtml(asset.serial):''}</span>`;
+      ls.classList.remove('flash'); void ls.offsetWidth; ls.classList.add('flash');
+    }
+  } else {
+    document.getElementById('f-toolname').value = '';
+    document.getElementById('f-tooltype').value = '';
+    document.getElementById('f-serial').value = '';
+    card.classList.remove('visible');
+    if(fromScan){
+      ls.innerHTML = `<span style="color:#888;font-size:12px;">Scanned:</span> <span class="val">${escHtml(tag)}</span><span class="unregistered">Not in registry — fill in details below or add to registry first</span>`;
+      ls.classList.remove('flash'); void ls.offsetWidth; ls.classList.add('flash');
+    }
+  }
 }
 
-/* ══ INIT ══ */
-document.addEventListener('DOMContentLoaded',()=>{
-  document.getElementById('est-date').value=new Date().toLocaleDateString('en-US');
-  buildAddons();buildSwatches();render();
-});
-</script>
+function onTagInput(val){ if(val.trim()) populateFromRegistry(val, false); else { document.getElementById('tool-match-card').classList.remove('visible'); } }
 
+function addEntry(){
+  const tag=document.getElementById('f-tag').value.trim();
+  if(!tag){ alert('Asset tag is required.'); return; }
+  log.unshift({
+    id:Date.now(), time:nowTime(),
+    date:document.getElementById('f-date').value||todayDate(),
+    tag, toolname:document.getElementById('f-toolname').value.trim(),
+    tooltype:document.getElementById('f-tooltype').value.trim(),
+    serial:document.getElementById('f-serial').value.trim(),
+    tech:document.getElementById('f-tech').value.trim(),
+    action:document.getElementById('f-action').value,
+    notes:document.getElementById('f-notes').value.trim()
+  });
+  renderLog();
+  ['f-tag','f-toolname','f-tooltype','f-serial','f-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('tool-match-card').classList.remove('visible');
+  document.getElementById('last-scan').innerHTML='<span>Waiting for scan…</span>';
+  lastScannedTag=null;
+}
+
+function renderLog(){
+  const tb=document.getElementById('log-body');
+  document.getElementById('entry-count').textContent=log.length+' entr'+(log.length===1?'y':'ies');
+  if(!log.length){ tb.innerHTML='<tr><td colspan="9" class="empty">No entries yet.</td></tr>'; return; }
+  tb.innerHTML=log.map(e=>{
+    const bc=e.action==='Check-In'?'badge-in':e.action==='Check-Out'?'badge-out':'badge-check';
+    return `<tr>
+      <td style="white-space:nowrap;color:#888;font-size:11px;">${escHtml(e.date)}<br>${escHtml(e.time)}</td>
+      <td><strong style="font-size:13px;">${escHtml(e.tag)}</strong></td>
+      <td style="font-size:12px;">${escHtml(e.toolname||'—')}</td>
+      <td>${e.tooltype?`<span class="badge badge-type">${escHtml(e.tooltype)}</span>`:'<span style="color:#ccc;font-size:12px;">—</span>'}</td>
+      <td style="font-size:11px;color:#888;">${escHtml(e.serial||'—')}</td>
+      <td style="font-size:12px;">${escHtml(e.tech||'—')}</td>
+      <td><span class="badge ${bc}">${escHtml(e.action)}</span></td>
+      <td style="color:#888;font-size:12px;">${escHtml(e.notes||'—')}</td>
+      <td><button class="small danger" onclick="removeEntry(${e.id})">✕</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function removeEntry(id){ const i=log.findIndex(e=>e.id===id); if(i>-1){log.splice(i,1); renderLog();} }
+
+function clearForm(){
+  ['f-tag','f-toolname','f-tooltype','f-serial','f-notes','f-tech'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('tool-match-card').classList.remove('visible');
+  document.getElementById('last-scan').innerHTML='<span>Waiting for scan…</span>';
+  lastScannedTag=null;
+}
+
+function clearLog(){ if(log.length&&confirm('Clear all '+log.length+' entries?')){ log.length=0; renderLog(); } }
+
+function saveAsset(){
+  const tag=document.getElementById('r-tag').value.trim().toUpperCase();
+  const name=document.getElementById('r-name').value.trim();
+  if(!tag||!name){ alert('Tag and tool name are required.'); return; }
+  const isEdit=!!assets[tag];
+  assets[tag]={tag,name,type:document.getElementById('r-type').value,model:document.getElementById('r-model').value.trim(),serial:document.getElementById('r-serial').value.trim(),price:document.getElementById('r-price').value,notes:document.getElementById('r-notes').value.trim()};
+  renderAssets();
+  const msg=document.getElementById('r-msg');
+  msg.textContent=(isEdit?'Updated: ':'Saved: ')+tag+' — '+name;
+  msg.style.display='block'; msg.style.color='#3b6d11';
+  setTimeout(()=>msg.style.display='none',3000);
+}
+
+function editAsset(tag){
+  const a=assets[tag]; if(!a) return;
+  document.getElementById('r-tag').value=a.tag;
+  document.getElementById('r-name').value=a.name;
+  document.getElementById('r-type').value=a.type||'';
+  document.getElementById('r-model').value=a.model||'';
+  document.getElementById('r-serial').value=a.serial||'';
+  document.getElementById('r-price').value=a.price||'';
+  document.getElementById('r-notes').value=a.notes||'';
+  document.querySelector('.tab[data-page="registry"]').click();
+  setTimeout(()=>document.getElementById('r-tag').focus(),100);
+}
+
+function deleteAsset(tag){ if(confirm('Remove '+tag+' from registry?')){ delete assets[tag]; renderAssets(); } }
+
+function clearRegistryForm(){
+  ['r-tag','r-name','r-model','r-serial','r-notes','r-price'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('r-type').value='';
+}
+
+function renderAssets(){
+  const keys=Object.keys(assets).sort();
+  document.getElementById('asset-count').textContent=keys.length+' asset'+(keys.length===1?'':'s');
+  const tb=document.getElementById('asset-body');
+  if(!keys.length){ tb.innerHTML='<tr><td colspan="7" class="empty">No assets registered yet.</td></tr>'; document.getElementById('asset-total-val').textContent=''; return; }
+  const total=keys.reduce((s,k)=>s+(parseFloat(assets[k].price)||0),0);
+  document.getElementById('asset-total-val').textContent=total?'Total value: $'+total.toFixed(2):'';
+  tb.innerHTML=keys.map(k=>{
+    const a=assets[k];
+    return `<tr>
+      <td><strong>${escHtml(a.tag)}</strong></td>
+      <td>${escHtml(a.name)}</td>
+      <td>${a.type?`<span class="type-pill">${escHtml(a.type)}</span>`:'—'}</td>
+      <td style="font-size:12px;color:#888;">${escHtml(a.model||'—')}</td>
+      <td style="font-size:12px;color:#888;">${escHtml(a.serial||'—')}</td>
+      <td style="font-size:12px;">${fmt$(a.price)}</td>
+      <td style="display:flex;gap:4px;"><button class="small" onclick="editAsset('${escHtml(k)}')">Edit</button><button class="small danger" onclick="deleteAsset('${escHtml(k)}')">✕</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function exportPDF(){
+  if(!log.length){ alert('Nothing to export.'); return; }
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'letter'});
+  const ds=document.getElementById('f-date').value||todayDate();
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.text('WilliamSmith Fireplaces',14,16);
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(120);
+  doc.text('Tool Scan Log — '+ds,14,22);
+  doc.text('Exported: '+new Date().toLocaleString(),255,22,{align:'right'});
+  doc.setTextColor(0);
+  const rows=[...log].reverse().map(e=>[e.date+' '+e.time,e.tag,e.toolname||'—',e.tooltype||'—',e.serial||'—',e.tech||'—',e.action,e.notes||'—']);
+  doc.autoTable({startY:28,head:[['Date / Time','Tag','Tool name','Type','Serial #','Tech','Action','Notes']],body:rows,styles:{fontSize:8,cellPadding:2.5},headStyles:{fillColor:[26,26,24],textColor:244,fontStyle:'bold'},alternateRowStyles:{fillColor:[248,246,243]},columnStyles:{0:{cellWidth:30},1:{cellWidth:18,fontStyle:'bold'},2:{cellWidth:40},3:{cellWidth:24},4:{cellWidth:28},5:{cellWidth:26},6:{cellWidth:22},7:{cellWidth:'auto'}}});
+  const pc=doc.internal.getNumberOfPages();
+  for(let i=1;i<=pc;i++){ doc.setPage(i); doc.setFontSize(8); doc.setTextColor(160); doc.text('Page '+i+' of '+pc+' — WilliamSmith Fireplaces Tool Scan Log',14,doc.internal.pageSize.height-8); }
+  doc.save('tool-scan-log-'+ds+'.pdf');
+}
+
+function exportRegistryPDF(){
+  const keys=Object.keys(assets).sort();
+  if(!keys.length){ alert('No assets to export.'); return; }
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'letter'});
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.text('WilliamSmith Fireplaces',14,16);
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(120);
+  doc.text('Asset Registry — '+keys.length+' tools',14,22);
+  doc.text('Exported: '+new Date().toLocaleString(),255,22,{align:'right'});
+  doc.setTextColor(0);
+  const rows=keys.map(k=>{const a=assets[k];return[a.tag,a.name,a.type||'—',a.model||'—',a.serial||'—',fmt$(a.price),a.notes||'—'];});
+  const total=keys.reduce((s,k)=>s+(parseFloat(assets[k].price)||0),0);
+  doc.autoTable({startY:28,head:[['Tag','Tool name','Type','Brand / model','Serial #','Value','Notes']],body:rows,styles:{fontSize:9,cellPadding:3},headStyles:{fillColor:[26,26,24],textColor:244,fontStyle:'bold'},alternateRowStyles:{fillColor:[248,246,243]},columnStyles:{0:{cellWidth:20,fontStyle:'bold'},1:{cellWidth:48},2:{cellWidth:28},3:{cellWidth:42},4:{cellWidth:32},5:{cellWidth:20},6:{cellWidth:'auto'}},foot:total?[['','','','','','Total','$'+total.toFixed(2)]]:undefined,footStyles:{fillColor:[26,26,24],textColor:244,fontStyle:'bold'}});
+  const pc=doc.internal.getNumberOfPages();
+  for(let i=1;i<=pc;i++){ doc.setPage(i); doc.setFontSize(8); doc.setTextColor(160); doc.text('Page '+i+' of '+pc+' — WilliamSmith Fireplaces Asset Registry',14,doc.internal.pageSize.height-8); }
+  doc.save('asset-registry-'+todayDate()+'.pdf');
+}
+
+window.addEventListener('load', initCamera);
+</script>
 </body>
 </html>
